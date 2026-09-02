@@ -232,7 +232,15 @@ func readError(err error) error {
 		case websocket.ClosePolicyViolation:
 			// The platform's own words: "Instance not found", "instance is
 			// not running", and so on.
-			return errors.New(reason)
+			//
+			// Authorization for the console runs inside the attach call
+			// rather than in the middleware, so every refusal that is not an
+			// authentication failure arrives here, after the upgrade. That
+			// means a missing instance reaches this path and not the HTTP one
+			// — and without the next line it would be the only place in the
+			// CLI where "not found" arrives with no mention of --account-id,
+			// which is the usual cause.
+			return errors.New(reason + notFoundHint(reason))
 		case websocket.CloseInternalServerErr, websocket.CloseServiceRestart, websocket.CloseTryAgainLater:
 			return fmt.Errorf("%s (the platform closed the console; this is worth retrying)", reason)
 		}
@@ -266,6 +274,18 @@ func dialError(err error, resp *http.Response) error {
 		return fmt.Errorf("connecting to the serial console: http %d: %s", resp.StatusCode, detail)
 	}
 	return fmt.Errorf("connecting to the serial console: http %d: %w", resp.StatusCode, err)
+}
+
+// notFoundHint adds the guidance the HTTP paths give for the same condition.
+//
+// Matching on the platform's wording is imperfect and deliberately harmless:
+// if the message changes, the hint is dropped rather than becoming wrong.
+func notFoundHint(reason string) string {
+	if !strings.Contains(strings.ToLower(reason), "not found") {
+		return ""
+	}
+	return ".\nThe instance does not exist, or is not visible to this account." +
+		"\nIf it belongs to another account, pass --account-id"
 }
 
 func indexByte(b []byte, c byte) int {
