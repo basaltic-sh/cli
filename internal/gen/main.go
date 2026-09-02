@@ -16,6 +16,17 @@ import (
 	"sort"
 )
 
+// handWritten operations get a command written by hand instead of a generated
+// one, and are skipped here.
+//
+// The serial console is the only one. It is a WebSocket upgrade carrying a raw
+// tty, which needs a terminal in raw mode, an escape key and bidirectional
+// binary frames — none of which a generated request/response command can
+// express. The generated form would compile and then not work.
+var handWritten = map[string]bool{
+	"startSerialConsole": true,
+}
+
 // excluded services are not part of the release.
 var excluded = map[string]bool{
 	"registry":      true,
@@ -82,6 +93,9 @@ func run(manifestPath, outDir string) error {
 func group(svc service) []resourceGroup {
 	byName := map[string][]operation{}
 	for _, op := range svc.Operations {
+		if handWritten[op.ID] {
+			continue
+		}
 		byName[op.Resource] = append(byName[op.Resource], op)
 	}
 	names := make([]string, 0, len(byName))

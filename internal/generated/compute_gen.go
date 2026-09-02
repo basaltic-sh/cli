@@ -401,7 +401,7 @@ func newComputeInstanceCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newComputeInstanceAttachVolumeCommand(state))
 	cmd.AddCommand(newComputeInstanceConsoleOutputCommand(state))
 	cmd.AddCommand(newComputeInstanceConsoleScreenshotCommand(state))
-	cmd.AddCommand(newComputeInstanceCreateConsoleCommand(state))
+	cmd.AddCommand(newComputeInstanceConsoleTicketCommand(state))
 	cmd.AddCommand(newComputeInstanceDetachNicCommand(state))
 	cmd.AddCommand(newComputeInstanceDetachVolumeCommand(state))
 	cmd.AddCommand(newComputeInstanceListNicsCommand(state))
@@ -409,7 +409,6 @@ func newComputeInstanceCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newComputeInstanceRebootCommand(state))
 	cmd.AddCommand(newComputeInstanceReinstallCommand(state))
 	cmd.AddCommand(newComputeInstanceResizeCommand(state))
-	cmd.AddCommand(newComputeInstanceSerialConsoleCommand(state))
 	cmd.AddCommand(newComputeInstanceStartCommand(state))
 	cmd.AddCommand(newComputeInstanceStopCommand(state))
 	cmd.AddCommand(newComputeInstanceUpdateVolumeCommand(state))
@@ -829,10 +828,10 @@ func newComputeInstanceConsoleScreenshotCommand(state *cli.State) *cobra.Command
 	return cmd
 }
 
-// newComputeInstanceCreateConsoleCommand builds `basaltic compute instance create-console`.
-func newComputeInstanceCreateConsoleCommand(state *cli.State) *cobra.Command {
+// newComputeInstanceConsoleTicketCommand builds `basaltic compute instance console-ticket`.
+func newComputeInstanceConsoleTicketCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create-console <instance-id>",
+		Use:   "console-ticket <instance-id>",
 		Short: "Mint a ticket for the serial console",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -1077,31 +1076,6 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.FlavorID, "flavor-id", "", "The target flavor to resize to")
 	_ = cmd.MarkFlagRequired("flavor-id")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
-	return cmd
-}
-
-// newComputeInstanceSerialConsoleCommand builds `basaltic compute instance serial-console`.
-func newComputeInstanceSerialConsoleCommand(state *cli.State) *cobra.Command {
-	var params compute.StartSerialConsoleParams
-	cmd := &cobra.Command{
-		Use:   "serial-console <instance-id>",
-		Short: "Open an interactive serial console",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
-			if err != nil {
-				return err
-			}
-			if err := c.StartSerialConsole(cmd.Context(), args[0], &params); err != nil {
-				return err
-			}
-			state.Printer().Done("Serial console requested.")
-			return nil
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.IntVar(&params.BacklogBytes, "backlog-bytes", 0, "Replay this many bytes of already-written output before live output begins, so attaching to a quiet guest shows why it is quiet instead of an empty screen")
 	return cmd
 }
 

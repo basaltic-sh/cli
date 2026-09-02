@@ -123,6 +123,15 @@ func NewRootCommand(state *State) *cobra.Command {
 		cmd.GroupID = "cli"
 		root.AddCommand(cmd)
 	}
+	for _, g := range grafts {
+		parent, _, err := root.Find(g.path)
+		if err != nil || parent == nil {
+			// A hand-written command whose parent the generator no longer
+			// emits would otherwise vanish silently.
+			panic(fmt.Sprintf("cannot graft onto %v: %v", g.path, err))
+		}
+		parent.AddCommand(g.add(state))
+	}
 	return root
 }
 
@@ -138,9 +147,27 @@ func RegisterService(add func(*State) *cobra.Command) {
 	serviceCommands = append(serviceCommands, add)
 }
 
-// RegisterBuiltin adds a hand-written command.
+// RegisterBuiltin adds a hand-written top-level command.
 func RegisterBuiltin(add func(*State) *cobra.Command) {
 	builtinCommands = append(builtinCommands, add)
+}
+
+// graft is a hand-written command that belongs inside the generated tree.
+type graft struct {
+	path []string
+	add  func(*State) *cobra.Command
+}
+
+var grafts []graft
+
+// RegisterAt adds a hand-written command underneath a generated one, for the
+// few operations a generated request/response command cannot express — the
+// serial console, which is a WebSocket carrying a raw tty.
+//
+// The generator skips those operations, so nothing is being replaced here: the
+// slot is empty and this fills it.
+func RegisterAt(path []string, add func(*State) *cobra.Command) {
+	grafts = append(grafts, graft{path: path, add: add})
 }
 
 // printError renders a failure the way the person reading it needs.
