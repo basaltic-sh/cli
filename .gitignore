@@ -1,0 +1,15 @@
+# Local development workspace: points the build at the SDK checkout next door.
+go.work
+go.work.sum
+
+# Build output.
+/basaltic
+*.test
+*.out
+
+# The compiled generator, if someone runs `go build` in its directory. This
+# has been committed by accident once; the entry is why it cannot happen again.
+/internal/gen/gen
+
+# Written when the generator emits source that does not parse.
+*.broken
