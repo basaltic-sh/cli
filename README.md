@@ -153,7 +153,8 @@ SDK's Go surface: every method, its parameters and their types. The CLI does
 not read the OpenAPI specifications and does not embed a copy of them.
 
 ```bash
-make generate SDK=/path/to/sdk-go
+make generate                      # from the SDK version in go.mod
+make generate SDK=/path/to/sdk-go  # against unreleased SDK changes
 ```
 
 Generated files are committed, so building the CLI needs nothing but this
