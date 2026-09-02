@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      # The SDK is a private repository in the same organisation. GITHUB_TOKEN
+      # is scoped to THIS repository only, so it cannot fetch it: this needs a
+      # token with read access to basaltic-sh/sdk-go, stored as SDK_READ_TOKEN.
+      # Once both repositories are public the whole step can go.
+      - name: Authenticate to the private SDK module
+        env:
+          SDK_READ_TOKEN: ${{ secrets.SDK_READ_TOKEN }}
+        run: |
+          if [ -z "$SDK_READ_TOKEN" ]; then
+            echo "SDK_READ_TOKEN is not set."
+            echo "The CLI depends on the private module github.com/basaltic-sh/sdk-go."
+            echo "Add a repository secret with read access to it, or make the SDK public."
+            exit 1
+          fi
+          go env -w GOPRIVATE=github.com/basaltic-sh
+          git config --global url."https://x-access-token:${SDK_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+  generator:
+    # The generator is a module of its own with no dependencies, so it builds
+    # and tests without any access to the SDK.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/gen
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
