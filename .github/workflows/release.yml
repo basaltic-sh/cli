@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # goreleaser creates the release and uploads assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # goreleaser builds its changelog from the commits since the previous
+          # tag, so it needs the history and the tags.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+
+      # Same private-module problem as CI: the CLI depends on
+      # github.com/basaltic-sh/sdk-go, and GITHUB_TOKEN is scoped to this
+      # repository alone. Fails with an explanation rather than a module
+      # resolution error part-way through a release.
+      - name: Authenticate to the private SDK module
+        env:
+          SDK_READ_TOKEN: ${{ secrets.SDK_READ_TOKEN }}
+        run: |
+          if [ -z "$SDK_READ_TOKEN" ]; then
+            echo "SDK_READ_TOKEN is not set, so the SDK module cannot be fetched."
+            echo "Add a repository secret with read access to basaltic-sh/sdk-go,"
+            echo "or make that repository public."
+            exit 1
+          fi
+          go env -w GOPRIVATE=github.com/basaltic-sh
+          git config --global url."https://x-access-token:${SDK_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      # A tag that does not build is a tag that has to be deleted, and a
+      # deleted tag is cached by everything that already fetched it. Cheaper to
+      # find out here.
+      - name: Test before releasing
+        run: go test ./...
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

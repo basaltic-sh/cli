@@ -8,12 +8,18 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/term"
+
 	basaltic "github.com/basaltic-sh/sdk-go"
 	"github.com/spf13/cobra"
 
 	"github.com/basaltic-sh/cli/internal/auth"
 	"github.com/basaltic-sh/cli/internal/output"
+	"github.com/basaltic-sh/cli/internal/selfupdate"
 )
+
+// isTerminal reports whether a person is likely reading this stream.
+func isTerminal(f *os.File) bool { return term.IsTerminal(int(f.Fd())) }
 
 // contextKey keys the per-invocation state stashed on the command context.
 type contextKey struct{}
@@ -24,6 +30,7 @@ type State struct {
 	opts     auth.Options
 	printer  *output.Printer
 	resolved *auth.Resolved
+	checker  *selfupdate.Checker
 }
 
 // Printer returns the configured renderer.
@@ -64,7 +71,15 @@ func Execute() int {
 	root := NewRootCommand(state)
 
 	ctx := context.WithValue(context.Background(), contextKey{}, state)
-	if err := root.ExecuteContext(ctx); err != nil {
+	err := root.ExecuteContext(ctx)
+
+	// Printed after the command, whatever its outcome, so it never sits
+	// between the user and the thing they ran — and never on stdout, where it
+	// would land in a pipe.
+	if notice := state.checker.Notice(); notice != "" {
+		fmt.Fprint(os.Stderr, notice)
+	}
+	if err != nil {
 		printError(os.Stderr, err)
 		return 1
 	}
@@ -95,6 +110,15 @@ func NewRootCommand(state *State) *cobra.Command {
 			state.printer.Format = f
 			noHeaders, _ := cmd.Flags().GetBool("no-headers")
 			state.printer.NoHeaders = noHeaders
+
+			// Only when a person is reading the output. A notice is noise in
+			// a pipeline, and machine-readable output must stay parseable —
+			// so text on a terminal, and nothing else. `upgrade` is skipped
+			// because it reports the same thing itself, better.
+			if f == output.Text && cmd.Name() != "upgrade" && isTerminal(os.Stderr) {
+				state.checker = selfupdate.NewChecker(auth.Version, nil, true)
+				state.checker.Start(cmd.Context())
+			}
 			return nil
 		},
 	}

@@ -1,0 +1,95 @@
+# Release configuration for the basaltic CLI.
+#
+# Run by .github/workflows/release.yml on a v* tag. Locally:
+#
+#     goreleaser release --snapshot --clean   # build everything, publish nothing
+version: 2
+
+project_name: basaltic
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: basaltic
+    main: .
+    binary: basaltic
+    env:
+      # No cgo anywhere in the dependency tree, and a static binary is what
+      # makes the install script's "download and run" work on any distribution.
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      # -s -w drop the symbol table and DWARF: a CLI is not debugged from a
+      # user's machine, and it takes about a third off the download.
+      - -s -w
+      - -X github.com/basaltic-sh/cli/internal/auth.Version={{ .Version }}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    # Windows on ARM is not worth the release-matrix row yet; nothing has asked.
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: basaltic
+    # The install script and `basaltic upgrade` both parse these names, so the
+    # template is a contract, not a preference. Keep it aligned with
+    # assetName() in internal/selfupdate.
+    name_template: "basaltic_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  # Both the install script and the upgrade command verify against this before
+  # putting anything on disk.
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: basaltic-sh
+    name: cli
+  # A release is cut by pushing a tag; leaving it a draft would mean the
+  # install script's "latest" briefly resolves to the previous version while
+  # someone remembers to publish it.
+  draft: false
+  prerelease: auto
+  header: |
+    ## basaltic {{ .Version }}
+
+    Install or upgrade:
+
+    ```
+    curl -fsSL https://get.basaltic.sh/cli | sh
+    ```
+
+    or, if it is already installed:
+
+    ```
+    basaltic upgrade
+    ```
+  footer: |
+    ---
+
+    Verify a download against `checksums.txt` before running it.

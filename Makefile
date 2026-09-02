@@ -53,6 +53,19 @@ check-generated: generate
 		exit 1; \
 	}
 
+# Builds a snapshot release and checks that goreleaser, install.sh and
+# internal/selfupdate still construct the same asset names. Nothing else
+# compares them, and a rename in one breaks upgrades for everyone already
+# installed while every test still passes.
+.PHONY: check-release
+check-release:
+	scripts/check-release-contract.sh
+
+# Builds every platform's archive into dist/ without publishing anything.
+.PHONY: snapshot
+snapshot:
+	goreleaser release --snapshot --clean --skip=publish
+
 .PHONY: install
 install:
 	go install -ldflags "$(LDFLAGS)" .
@@ -60,3 +73,4 @@ install:
 .PHONY: clean
 clean:
 	rm -f $(BINARY)
+	rm -rf dist

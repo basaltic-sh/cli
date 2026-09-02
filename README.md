@@ -4,8 +4,42 @@ The command-line interface for the [Basaltic](https://basaltic.sh) cloud
 platform.
 
 ```bash
+curl -fsSL https://get.basaltic.sh/cli | sh
+```
+
+The script picks the build for your platform, verifies it against the checksum
+published with the release, and installs to `/usr/local/bin` when that is
+writable or `~/.local/bin` otherwise. Read it first if you would rather —
+[`install.sh`](install.sh) is the same file that URL serves.
+
+```bash
+BASALTIC_INSTALL_DIR=~/bin  curl -fsSL https://get.basaltic.sh/cli | sh   # somewhere else
+BASALTIC_VERSION=1.2.3      curl -fsSL https://get.basaltic.sh/cli | sh   # a specific version
+```
+
+Or from source, or from the [releases page](https://github.com/basaltic-sh/cli/releases):
+
+```bash
 go install github.com/basaltic-sh/cli@latest
 ```
+
+## Staying current
+
+```bash
+basaltic upgrade          # install the latest version
+basaltic upgrade --check  # only say whether one exists
+```
+
+The CLI mentions when a newer version is available and never installs it for
+you: a tool that replaces its own binary unasked is one that changes under a
+script between two runs. The notice appears on stderr, only on a terminal, and
+never when the output is JSON or YAML — so it cannot land in something being
+parsed. `BASALTIC_NO_UPDATE_CHECK=1` turns it off, as does `CI`.
+
+Upgrading verifies the download against the release checksum before writing
+anything, and swaps the binary with a rename, so an interrupted upgrade leaves
+either the old version or the new one. A binary installed by Homebrew, Nix,
+snap or a system package is left alone with a note to use that instead.
 
 ## Getting started
 
@@ -160,6 +194,24 @@ make generate SDK=/path/to/sdk-go  # against unreleased SDK changes
 Generated files are committed, so building the CLI needs nothing but this
 repository. Do not edit them; change the SDK, regenerate, and commit the
 result. `make check-generated` fails when the two have drifted.
+
+## Releasing
+
+Push a `v*` tag. `.github/workflows/release.yml` runs goreleaser, which builds
+Linux, macOS and Windows binaries for amd64 and arm64, publishes them with a
+`checksums.txt`, and writes the release notes from the commits since the last
+tag.
+
+Three places construct the asset names — `.goreleaser.yaml`, `install.sh`, and
+`AssetName` in `internal/selfupdate` — and nothing in an ordinary build
+compares them. `make check-release` builds a snapshot and checks all three
+agree; CI runs it on every pull request, because a rename in one breaks
+upgrades for everyone already installed while every other test stays green.
+
+```bash
+make snapshot        # build every platform into dist/, publish nothing
+make check-release   # and verify the three agree
+```
 
 ## License
 
