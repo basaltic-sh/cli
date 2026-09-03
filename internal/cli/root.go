@@ -93,6 +93,10 @@ func NewRootCommand(state *State) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "basaltic",
 		Short: "Command-line interface for the Basaltic cloud platform",
+		// Gives cobra a --version flag. `basaltic version` reports more — the
+		// SDK version, Go, the platform — but --version is what people type
+		// first, and an unknown-flag error is a poor answer to it.
+		Version: auth.Version,
 		Long: "Command-line interface for the Basaltic cloud platform.\n\n" +
 			"Commands are grouped by service, then by resource:\n\n" +
 			"    basaltic <service> <resource> <verb> [flags]\n\n" +
