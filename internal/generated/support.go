@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/basaltic-sh/cli/internal/progress"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -58,15 +60,29 @@ func loadBody(path string, v any) error {
 // openBody returns a reader for an operation whose body is raw bytes,
 // streaming from disk rather than buffering: an object upload can be larger
 // than memory.
+//
+// The reader is wrapped in a progress reporter. This is the single chokepoint
+// every streaming request body passes through, so one wrap covers every such
+// operation the generator emits, now and later.
 func openBody(path string) (io.Reader, func(), error) {
 	if path == "" || path == "-" {
-		return os.Stdin, func() {}, nil
+		// stdin has no length to be a fraction of, so the reporter shows
+		// bytes and a rate rather than a percentage.
+		r, done := progress.Wrap(os.Stdin, 0, "uploading")
+		return r, done, nil
 	}
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
 	}
-	return f, func() { f.Close() }, nil
+	// A total makes the difference between "something is happening" and "this
+	// finishes in nine minutes", which is what decides whether someone waits.
+	var total int64
+	if info, err := f.Stat(); err == nil {
+		total = info.Size()
+	}
+	r, done := progress.Wrap(f, total, "uploading")
+	return r, func() { done(); f.Close() }, nil
 }
 
 // readBody reads a whole body into memory, for the operations whose body is
