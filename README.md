@@ -211,7 +211,14 @@ upgrades for everyone already installed while every other test stays green.
 ```bash
 make snapshot        # build every platform into dist/, publish nothing
 make check-release   # and verify the three agree
+make check-pinned    # build as a consumer does, ignoring go.work
 ```
+
+`go.work` points local builds at an SDK checkout next door, which is what makes
+developing the two together bearable — and it will happily compile against SDK
+changes that no published version has. `make check-pinned` builds against the
+version `go.mod` names instead. Run it before tagging; CI runs it on every
+pull request.
 
 ## License
 

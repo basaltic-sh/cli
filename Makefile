@@ -12,7 +12,7 @@ VERSION ?= dev
 LDFLAGS := -X github.com/basaltic-sh/cli/internal/auth.Version=$(VERSION)
 
 .PHONY: all
-all: build test
+all: build test check-pinned
 
 .PHONY: build
 build:
@@ -33,6 +33,18 @@ generate:
 	}
 	cd internal/gen && GOWORK=off go run . -manifest "$(SDK_DIR)/api.json" -out ../generated
 	gofmt -w internal/generated
+
+# Builds the way CI and every consumer sees it: no go.work, so the SDK comes
+# from the version go.mod pins rather than the checkout next door.
+#
+# This exists because the workspace hid a real breakage. Generated code was
+# regenerated against unreleased SDK changes and referenced symbols no
+# published version had; everything built locally and the tagged release
+# failed. Run this before tagging.
+.PHONY: check-pinned
+check-pinned:
+	GOWORK=off go build ./...
+	GOWORK=off go test ./...
 
 .PHONY: test
 test:
