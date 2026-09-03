@@ -102,8 +102,8 @@ func NewRootCommand(state *State) *cobra.Command {
 			"    basaltic <service> <resource> <verb> [flags]\n\n" +
 			"For example:\n\n" +
 			"    basaltic compute instance list\n" +
-			"    basaltic network vpc create --name prod --cidr 10.0.0.0/16\n" +
-			"    basaltic storage volume attach vol-1 --instance-id i-1",
+			"    basaltic network vpc create --name prod --cidr-v4 10.0.0.0/16\n" +
+			"    basaltic compute instance attach-volume i-1 --volume-id vol-1",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
