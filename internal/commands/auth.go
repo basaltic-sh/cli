@@ -128,10 +128,14 @@ func newAuthStatusCommand(state *cli.State) *cobra.Command {
 			fmt.Fprintf(out, "Access key:  %s\n", orDefault(mask(resolved.AccessKeyID), "(a token supplied directly)"))
 
 			if resolved.AccessKeyID != "" {
-				if expiry, ok := config.CachedTokenExpiry(resolved.Profile, resolved.AccessKeyID); ok {
-					fmt.Fprintf(out, "Token:       cached, expires in %s\n", until(expiry))
-				} else {
+				expiry, ok := config.CachedTokenExpiry(resolved.Profile, resolved.AccessKeyID)
+				switch {
+				case !ok:
 					fmt.Fprintln(out, "Token:       none cached; the next command will exchange one")
+				case time.Until(expiry) <= 0:
+					fmt.Fprintln(out, "Token:       cached but expired; the next command will exchange one")
+				default:
+					fmt.Fprintf(out, "Token:       cached, expires in %s\n", until(expiry))
 				}
 			}
 
@@ -201,10 +205,13 @@ func mask(key string) string {
 	return key[:6] + strings.Repeat("*", len(key)-10) + key[len(key)-4:]
 }
 
+// until renders a remaining lifetime. Only called for a token that has not
+// expired; the expired case reads badly as a duration and is worded
+// separately by the caller.
 func until(t time.Time) string {
 	d := time.Until(t)
-	if d <= 0 {
-		return "already (it will be re-exchanged)"
+	if d < time.Minute {
+		return "under a minute"
 	}
 	return d.Round(time.Minute).String()
 }
