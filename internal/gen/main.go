@@ -33,6 +33,7 @@ var excluded = map[string]bool{
 	"queue":         true,
 	"notifications": true,
 	"email":         true,
+	"database":      true,
 }
 
 func main() {

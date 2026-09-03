@@ -67,8 +67,8 @@ func TestEveryCommandIsWellFormed(t *testing.T) {
 
 	// A guard on the walk: a wiring change that stopped registering the
 	// generated tree would otherwise leave every assertion above vacuous.
-	if leaves < 380 {
-		t.Errorf("found %d runnable commands, want the whole generated surface (387 plus the built-ins)", leaves)
+	if leaves < 350 {
+		t.Errorf("found %d runnable commands, want the whole generated surface (359 plus the built-ins)", leaves)
 	}
 	if groups < 60 {
 		t.Errorf("found %d command groups, want one per service and resource", groups)
@@ -120,19 +120,19 @@ func TestTreeIsServiceResourceVerb(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"audit", "billing", "certificate", "compute", "database", "dns", "iam",
+		"audit", "billing", "certificate", "compute", "dns", "iam",
 		"kms", "loadbalancer", "network", "quota", "secrets", "storage", "telemetry",
 	} {
 		if !services[want] {
 			t.Errorf("no top-level command for the %s service", want)
 		}
 	}
-	if len(services) != 14 {
-		t.Errorf("found %d services at the top level, want 14", len(services))
+	if len(services) != 13 {
+		t.Errorf("found %d services at the top level, want 13", len(services))
 	}
 
 	// Nothing that is not part of the release should be reachable.
-	for _, gone := range []string{"registry", "queue", "notifications", "email", "topics", "repositories"} {
+	for _, gone := range []string{"database", "registry", "queue", "notifications", "email", "topics", "repositories"} {
 		if services[gone] {
 			t.Errorf("%q is not part of the release but has a command", gone)
 		}
@@ -166,7 +166,7 @@ func TestResourcesAcceptTheirPluralAsAnAlias(t *testing.T) {
 
 func TestServiceAliases(t *testing.T) {
 	root := rootCommand(t)
-	for alias, want := range map[string]string{"lb": "loadbalancer", "net": "network", "db": "database"} {
+	for alias, want := range map[string]string{"lb": "loadbalancer", "net": "network", "cert": "certificate"} {
 		cmd, _, err := root.Find([]string{alias})
 		if err != nil {
 			t.Errorf("alias %q did not resolve: %v", alias, err)

@@ -29,6 +29,7 @@ func newIamCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newIamAccountCommand(state))
 	cmd.AddCommand(newIamGroupCommand(state))
 	cmd.AddCommand(newIamInvitationCommand(state))
+	cmd.AddCommand(newIamOauthCommand(state))
 	cmd.AddCommand(newIamOrganizationCommand(state))
 	cmd.AddCommand(newIamPolicyCommand(state))
 	cmd.AddCommand(newIamRegionCommand(state))
@@ -765,6 +766,63 @@ func newIamInvitationCancelCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newIamOauthCommand builds `basaltic iam oauth`.
+func newIamOauthCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "oauth",
+		Short:   "Oauths",
+		Aliases: []string{"oauths"},
+	}
+	cmd.AddCommand(newIamOauthAuthorizeCommand(state))
+	return cmd
+}
+
+// newIamOauthAuthorizeCommand builds `basaltic iam oauth authorize`.
+func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
+	var body iam.OAuthAuthorizeRequest
+	var bodyFile string
+	var stateFlag string
+	cmd := &cobra.Command{
+		Use:   "authorize",
+		Short: "Approve a CLI login and issue an authorization code",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state)
+			if err != nil {
+				return err
+			}
+			if bodyFile != "" {
+				if err := loadBody(bodyFile, &body); err != nil {
+					return err
+				}
+			}
+			if cmd.Flags().Changed("state") {
+				body.State = &stateFlag
+			}
+			out, err := c.AuthorizeOAuthClient(cmd.Context(), &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.ClientID, "client-id", "", "The registered client being approved")
+	_ = cmd.MarkFlagRequired("client-id")
+	f.StringVar(&body.CodeChallenge, "code-challenge", "", "Base64url SHA-256 of the client's PKCE verifier, without padding")
+	_ = cmd.MarkFlagRequired("code-challenge")
+	f.StringVar(&body.CodeChallengeMethod, "code-challenge-method", "", "S256 only (one of: S256)")
+	_ = cmd.MarkFlagRequired("code-challenge-method")
+	f.StringVar(&body.OrganizationID, "organization-id", "", "Which organization the resulting session is scoped to")
+	_ = cmd.MarkFlagRequired("organization-id")
+	f.StringVar(&body.RedirectURI, "redirect-uri", "", "Where to deliver the code")
+	_ = cmd.MarkFlagRequired("redirect-uri")
+	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
 	return cmd
 }
 
@@ -2650,7 +2708,11 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var clientIdFlag string
 	var clientSecretFlag string
+	var codeFlag string
+	var codeVerifierFlag string
 	var durationSecondsFlag int
+	var redirectUriFlag string
+	var refreshTokenFlag string
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Exchange an access key for a bearer token",
@@ -2671,8 +2733,20 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("client-secret") {
 				body.ClientSecret = &clientSecretFlag
 			}
+			if cmd.Flags().Changed("code") {
+				body.Code = &codeFlag
+			}
+			if cmd.Flags().Changed("code-verifier") {
+				body.CodeVerifier = &codeVerifierFlag
+			}
 			if cmd.Flags().Changed("duration-seconds") {
 				body.DurationSeconds = &durationSecondsFlag
+			}
+			if cmd.Flags().Changed("redirect-uri") {
+				body.RedirectURI = &redirectUriFlag
+			}
+			if cmd.Flags().Changed("refresh-token") {
+				body.RefreshToken = &refreshTokenFlag
 			}
 			out, err := c.GetOAuthToken(cmd.Context(), &body)
 			if err != nil {
@@ -2686,9 +2760,13 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&clientIdFlag, "client-id", "", "The access key id")
 	f.StringVar(&clientSecretFlag, "client-secret", "", "The secret access key")
+	f.StringVar(&codeFlag, "code", "", "The authorization code from the consent redirect")
+	f.StringVar(&codeVerifierFlag, "code-verifier", "", "The PKCE verifier whose SHA-256 was sent as code_challenge when the flow started (RFC 7636)")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Requested token lifetime")
-	f.StringVar(&body.GrantType, "grant-type", "", "Only client_credentials is served (one of: client_credentials)")
+	f.StringVar(&body.GrantType, "grant-type", "", "client_credentials is the one to use for a service account: it exchanges an access key pair for a token, and needs nothing else (one of: client_credentials, authorization_code, refresh_token)")
 	_ = cmd.MarkFlagRequired("grant-type")
+	f.StringVar(&redirectUriFlag, "redirect-uri", "", "The same redirect_uri the code was issued for")
+	f.StringVar(&refreshTokenFlag, "refresh-token", "", "refresh_token grant only")
 	return cmd
 }
 
