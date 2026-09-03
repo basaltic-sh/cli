@@ -67,6 +67,25 @@ func newReader(r io.Reader, total int64, label string, out io.Writer) (*Reader, 
 	return p, p.Finish
 }
 
+// Size reports the total the reporter was given, or -1 when it has none.
+//
+// Load-bearing rather than convenience: the SDK sets Content-Length from a
+// seekable body, and wrapping the file hides the *os.File from it. With no
+// length declared the request goes out chunked, and a chunked upload cannot be
+// checked for truncation server-side — so without this, adding a progress bar
+// would silently disable the protection against a partial object.
+//
+// -1 AND NOT 0 for unknown. The SDK treats any non-negative answer as a real
+// length, so returning 0 would declare an empty body and send nothing at all —
+// turning "I do not know how big this is" into "this is empty". Reading from
+// stdin is exactly that case.
+func (p *Reader) Size() int64 {
+	if p.total <= 0 {
+		return -1
+	}
+	return p.total
+}
+
 func (p *Reader) Read(b []byte) (int, error) {
 	n, err := p.inner.Read(b)
 	if n > 0 {

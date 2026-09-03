@@ -128,3 +128,25 @@ func TestWrapSkipsWhenStderrIsNotATerminal(t *testing.T) {
 		t.Error("the reader was wrapped despite stderr not being a terminal")
 	}
 }
+
+// The SDK derives Content-Length from a seekable body, and wrapping hides the
+// *os.File from it. Reporting Size keeps the length visible — without it,
+// adding a progress bar would silently turn a length-declared upload into a
+// chunked one, which cannot be checked for truncation server-side.
+func TestReaderReportsItsSizeThroughTheWrapper(t *testing.T) {
+	p, _ := newReader(strings.NewReader("payload"), 4096, "uploading", &bytes.Buffer{})
+	var sized interface{ Size() int64 } = p
+	if got := sized.Size(); got != 4096 {
+		t.Errorf("Size() = %d, want 4096", got)
+	}
+}
+
+// An unknown total must report -1, not 0. The SDK treats any non-negative
+// answer as a real length, so 0 would declare an empty body and send nothing —
+// silently uploading a zero-byte object instead of the piped data.
+func TestReaderReportsUnknownSizeAsNegative(t *testing.T) {
+	p, _ := newReader(strings.NewReader("payload"), 0, "uploading", &bytes.Buffer{})
+	if got := p.Size(); got != -1 {
+		t.Errorf("Size() = %d, want -1 for an unknown total; 0 would declare an empty body", got)
+	}
+}
