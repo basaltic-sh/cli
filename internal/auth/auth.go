@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/basaltic-sh/cli/internal/config"
+	"github.com/basaltic-sh/cli/internal/oauth"
 	basaltic "github.com/basaltic-sh/sdk-go"
 )
 
@@ -32,6 +33,14 @@ type Resolved struct {
 	AccountID   string
 	AccessKeyID string
 	TokenSource *config.FileTokenSource
+
+	// UserSession is set when the profile authenticates as a PERSON — an
+	// interactive login rather than a service-account key pair. The two are
+	// mutually exclusive, and which one is in play changes what the caller can
+	// do: only a user can create an organization, accept an invitation or
+	// switch org.
+	UserSession bool
+	SessionTTL  time.Time
 }
 
 // Resolve builds the SDK configuration.
@@ -81,10 +90,29 @@ func Resolve(opts Options) (*Resolved, error) {
 		return res, nil
 	}
 
+	// An interactive login is used only when no key pair is configured. A
+	// profile with both is a profile someone has deliberately pointed at a
+	// service account, and silently preferring their personal session would
+	// run commands as the wrong principal.
 	if strings.TrimSpace(apiKey) == "" {
+		if _, _, _, expires, ok := config.LookupSession(name); ok {
+			ts := &config.SessionTokenSource{
+				Profile: name,
+				Client:  httpClient(profile.Insecure || opts.Insecure),
+				Refresh: refreshSession,
+			}
+			cfg, err := basaltic.NewConfig(context.Background(), append(sdkOpts, basaltic.WithTokenSource(ts))...)
+			if err != nil {
+				return nil, err
+			}
+			res.Config = cfg
+			res.UserSession = true
+			res.SessionTTL = expires
+			return res, nil
+		}
 		return nil, fmt.Errorf(
 			"no credentials for profile %q.\n"+
-				"Run `basaltic auth login`, set BASALTIC_API_KEY, or pass --api-key ACCESS_KEY_ID:SECRET", name)
+				"Run `basaltic login` to sign in as yourself, set BASALTIC_API_KEY, or pass --api-key ACCESS_KEY_ID:SECRET", name)
 	}
 	keyID, secret, err := config.Profile{APIKey: apiKey}.Credentials()
 	if err != nil {
@@ -129,4 +157,25 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// refreshSession adapts the oauth package's Refresh to the config package's
+// Refresher, which is a function type precisely so config does not import
+// oauth — oauth already imports config for storage.
+func refreshSession(ctx context.Context, client *http.Client, tokenEndpoint, refreshToken string) (string, string, time.Time, error) {
+	toks, err := oauth.Refresh(ctx, client, tokenEndpoint, refreshToken)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	return toks.AccessToken, toks.RefreshToken, toks.ExpiresAt, nil
+}
+
+// httpClient returns the client the login and refresh calls use. It mirrors
+// the SDK's TLS handling so a development rig with a self-signed certificate
+// behaves the same on the auth path as everywhere else.
+func httpClient(insecure bool) *http.Client {
+	if insecure {
+		return insecureClient()
+	}
+	return &http.Client{Timeout: 30 * time.Second}
 }

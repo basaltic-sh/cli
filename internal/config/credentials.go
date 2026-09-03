@@ -32,6 +32,32 @@ const refreshSkew = 5 * time.Minute
 
 type credentialsFile struct {
 	Tokens map[string]cachedToken `yaml:"tokens,omitempty"`
+
+	// Sessions holds interactive logins, keyed by profile.
+	//
+	// A SECOND SHAPE RATHER THAN A WIDER KEY. A service-account token is keyed
+	// on the access key it came from, so rotating the key invalidates the
+	// cache. A user session has no access key to rotate — what it has instead
+	// is a refresh token, which cachedToken has nowhere to put. Widening one
+	// struct would have left every service-account row carrying an empty
+	// refresh token and every user row an empty key id, with nothing but
+	// convention saying which fields were meaningful for which.
+	Sessions map[string]userSession `yaml:"sessions,omitempty"`
+}
+
+// userSession is a person's login (`basaltic login`).
+type userSession struct {
+	AccessToken string `yaml:"access_token"`
+	// RefreshToken renews the session without another browser trip. It ROTATES
+	// on every use: the value returned by a refresh replaces this one, and
+	// keeping the old one loses the session.
+	RefreshToken string    `yaml:"refresh_token,omitempty"`
+	ExpiresAt    time.Time `yaml:"expires_at"`
+	// TokenEndpoint is recorded so a refresh does not have to re-discover the
+	// authorization server. A session belongs to the deployment that issued
+	// it, and re-resolving from current config could point a stored session at
+	// a different platform.
+	TokenEndpoint string `yaml:"token_endpoint,omitempty"`
 }
 
 type cachedToken struct {
@@ -170,6 +196,62 @@ func (f *credentialsFile) lookup(profile, accessKeyID string) (string, bool) {
 		return "", false
 	}
 	return t.AccessToken, true
+}
+
+// LookupSession returns a profile's user session, if it has one.
+func LookupSession(profile string) (accessToken, refreshToken, tokenEndpoint string, expiresAt time.Time, ok bool) {
+	path, err := CredentialsPath()
+	if err != nil {
+		return "", "", "", time.Time{}, false
+	}
+	s, found := loadCredentials(path).Sessions[profile]
+	if !found || s.AccessToken == "" {
+		return "", "", "", time.Time{}, false
+	}
+	return s.AccessToken, s.RefreshToken, s.TokenEndpoint, s.ExpiresAt, true
+}
+
+// SessionFresh reports whether a stored access token is still usable, applying
+// the same skew as the service-account cache so a token cannot lapse midway
+// through a command.
+func SessionFresh(expiresAt time.Time) bool {
+	return time.Now().Before(expiresAt.Add(-refreshSkew))
+}
+
+// StoreSession writes a profile's user session.
+func StoreSession(profile, accessToken, refreshToken, tokenEndpoint string, expiresAt time.Time) error {
+	path, err := CredentialsPath()
+	if err != nil {
+		return err
+	}
+	file := loadCredentials(path)
+	if file.Sessions == nil {
+		file.Sessions = map[string]userSession{}
+	}
+	file.Sessions[profile] = userSession{
+		AccessToken:   accessToken,
+		RefreshToken:  refreshToken,
+		ExpiresAt:     expiresAt,
+		TokenEndpoint: tokenEndpoint,
+	}
+	return saveCredentials(path, file)
+}
+
+// ForgetSession clears a profile's user session. Returns the refresh token it
+// removed, so `auth logout` can revoke server-side what it just deleted
+// locally — deleting the file alone would leave a live session nobody can see.
+func ForgetSession(profile string) (refreshToken, tokenEndpoint string, err error) {
+	path, perr := CredentialsPath()
+	if perr != nil {
+		return "", "", perr
+	}
+	file := loadCredentials(path)
+	s, ok := file.Sessions[profile]
+	if !ok {
+		return "", "", nil
+	}
+	delete(file.Sessions, profile)
+	return s.RefreshToken, s.TokenEndpoint, saveCredentials(path, file)
 }
 
 func (f *credentialsFile) store(profile, accessKeyID, token string, expiresAt time.Time) {
