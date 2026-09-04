@@ -1,10 +1,13 @@
 package oauth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -48,73 +51,10 @@ func TestPKCEIsFreshEachTime(t *testing.T) {
 	}
 }
 
-// The state comparison is the CLIENT's half of the flow, and nothing on the
-// server substitutes for it: the platform will happily issue a code for a
-// legitimate authorization, and this is what stops a code from a DIFFERENT
-// authorization being fed to this listener.
-func TestCallbackRefusesMismatchedState(t *testing.T) {
-	result := make(chan callbackResult, 1)
-	h := callbackHandler("the-real-state", result)
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/callback?code=stolen&state=some-other-state", nil)
-	h.ServeHTTP(rec, req)
-
-	got := <-result
-	if got.err == nil {
-		t.Fatal("a mismatched state must be refused")
-	}
-	if got.code != "" {
-		t.Errorf("a refused callback must not yield a code, got %q", got.code)
-	}
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", rec.Code)
-	}
-}
-
-func TestCallbackAcceptsMatchingState(t *testing.T) {
-	result := make(chan callbackResult, 1)
-	h := callbackHandler("s", result)
-
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/callback?code=abc123&state=s", nil))
-
-	got := <-result
-	if got.err != nil {
-		t.Fatalf("unexpected error: %v", got.err)
-	}
-	if got.code != "abc123" {
-		t.Errorf("code = %q, want abc123", got.code)
-	}
-	// The page renders the code in its URL, so it must not be stored.
-	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
-		t.Errorf("Cache-Control = %q, want no-store", cc)
-	}
-}
-
-// A refusal on the consent page comes back as ?error=..., not as a transport
-// failure. Reporting it as "no code returned" would send the user looking for
-// a bug instead of telling them they pressed Cancel.
-func TestCallbackSurfacesAuthorizationError(t *testing.T) {
-	result := make(chan callbackResult, 1)
-	h := callbackHandler("s", result)
-
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
-		"/callback?state=s&error=access_denied&error_description=You+cancelled", nil))
-
-	got := <-result
-	if got.err == nil {
-		t.Fatal("an authorization error must be reported")
-	}
-	if !strings.Contains(got.err.Error(), "You cancelled") {
-		t.Errorf("the description should reach the user, got %q", got.err)
-	}
-}
-
+// The authorize URL is the whole request: there is no redirect to carry
+// anything back, so what is not in this URL is not in the flow.
 func TestBuildAuthorizeURL(t *testing.T) {
-	raw, err := buildAuthorizeURL("https://console.example/cli/authorize",
-		"http://127.0.0.1:53682/callback", "the-challenge", "the-state")
+	raw, err := buildAuthorizeURL("https://console.example/cli/authorize", "the-challenge")
 	if err != nil {
 		t.Fatalf("buildAuthorizeURL: %v", err)
 	}
@@ -122,12 +62,81 @@ func TestBuildAuthorizeURL(t *testing.T) {
 		"client_id=" + ClientID,
 		"code_challenge=the-challenge",
 		"code_challenge_method=S256",
-		"state=the-state",
-		"redirect_uri=http%3A%2F%2F127.0.0.1%3A53682%2Fcallback",
+		"redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob",
 	} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("authorize URL is missing %s\ngot %s", want, raw)
 		}
+	}
+	// State binds a redirect to the request that caused it. There is no
+	// redirect, so sending one would be cargo cult: nothing on either side
+	// would compare it.
+	if strings.Contains(raw, "state=") {
+		t.Errorf("the out-of-band flow has no redirect to protect with state\ngot %s", raw)
+	}
+	// An authorize URL the console already parameterises must keep its own
+	// query, not have it replaced.
+	raw, err = buildAuthorizeURL("https://console.example/cli/authorize?ref=docs", "c")
+	if err != nil {
+		t.Fatalf("buildAuthorizeURL: %v", err)
+	}
+	if !strings.Contains(raw, "ref=docs") {
+		t.Errorf("an existing query parameter was dropped: %s", raw)
+	}
+}
+
+// The code arrives through a clipboard and a terminal, either of which adds a
+// newline. Sending it untrimmed would fail with invalid_grant, which the
+// server deliberately does not explain — so the user would be told their
+// correct paste was wrong.
+func TestRedeemTrimsThePastedCode(t *testing.T) {
+	var got url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		got = r.PostForm
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"access_token":"at","refresh_token":"rt","token_type":"Bearer","expires_in":3600}`)
+	}))
+	defer srv.Close()
+
+	req, err := NewRequest(&Metadata{AuthorizationEndpoint: "https://console.example/cli/authorize"})
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	toks, err := req.Redeem(context.Background(), srv.Client(), srv.URL, "  the-code\n")
+	if err != nil {
+		t.Fatalf("Redeem: %v", err)
+	}
+	if toks.AccessToken != "at" || toks.RefreshToken != "rt" {
+		t.Errorf("tokens = %+v", toks)
+	}
+	if got.Get("code") != "the-code" {
+		t.Errorf("code = %q, want the-code", got.Get("code"))
+	}
+	// The redirect the server re-checks the code against (RFC 6749 4.1.3).
+	if got.Get("redirect_uri") != RedirectURIOOB {
+		t.Errorf("redirect_uri = %q, want %q", got.Get("redirect_uri"), RedirectURIOOB)
+	}
+	// The verifier is what proves this is the process that started the flow.
+	// A request that reached the endpoint without one would be a client with
+	// no authentication at all.
+	sum := sha256.Sum256([]byte(got.Get("code_verifier")))
+	if !strings.Contains(req.AuthorizationURL,
+		"code_challenge="+base64.RawURLEncoding.EncodeToString(sum[:])) {
+		t.Error("the verifier sent does not match the challenge that was approved")
+	}
+}
+
+// An empty paste must not be spent against the token endpoint. It cannot
+// succeed, and the answer it would come back with — invalid_grant — reads as
+// "your code was wrong" rather than "you pressed enter".
+func TestRedeemRefusesAnEmptyCode(t *testing.T) {
+	req, err := NewRequest(&Metadata{AuthorizationEndpoint: "https://console.example/x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := req.Redeem(context.Background(), http.DefaultClient, "http://127.0.0.1:1", "   \n"); err == nil {
+		t.Fatal("an empty code must be refused before it is sent")
 	}
 }
 

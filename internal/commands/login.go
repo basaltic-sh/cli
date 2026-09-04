@@ -1,10 +1,14 @@
 package commands
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -39,8 +43,12 @@ func runLoginCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Sign in as yourself through a browser",
-		Long: "Sign in as yourself. Opens a browser, asks you to approve this CLI and pick an\n" +
-			"organization, and stores a short-lived token that acts as you.\n\n" +
+		Long: "Sign in as yourself. Prints a URL to approve this CLI at and pick an\n" +
+			"organization; the page shows a code, you paste it back here, and a short-lived\n" +
+			"token that acts as you is stored.\n\n" +
+			"The browser does not have to be on this machine. Open the URL wherever you are\n" +
+			"signed in and carry the code over — that is the whole reason it is a code and\n" +
+			"not a redirect.\n\n" +
 			"Use this when you are a person at a terminal. For a program that has to run\n" +
 			"without you — CI, a cron job — store a service account key instead with\n" +
 			"`basaltic auth login --api-key ACCESS_KEY_ID:SECRET`.\n\n" +
@@ -86,8 +94,13 @@ func runLoginCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 6*time.Minute)
-			defer cancel()
+			// No overall deadline. The slow step is a person — finding the
+			// browser, signing in, passing a second factor, copying a code —
+			// and a timeout around that would cancel the paste rather than
+			// the network. The code carries its own five-minute life, which
+			// is the deadline that actually matters, and the HTTP client
+			// bounds every call this makes.
+			ctx := cmd.Context()
 
 			meta, err := oauth.DiscoverMetadata(ctx, client, iamURL)
 			if err != nil {
@@ -102,13 +115,24 @@ func runLoginCommand(state *cli.State) *cobra.Command {
 						"Use a service account key: `basaltic auth login --api-key ACCESS_KEY_ID:SECRET`", iamURL)
 			}
 
+			req, err := oauth.NewRequest(meta)
+			if err != nil {
+				return err
+			}
+
 			out := state.Printer().Out
-			toks, err := oauth.Login(ctx, client, meta, func(u string) {
-				// Printed BEFORE the browser is attempted, and always. An SSH
-				// session has no browser to open, and a flow that waits
-				// silently on a page nobody can see looks like a hang.
-				fmt.Fprintf(out, "Open this URL to sign in:\n\n  %s\n\nWaiting…\n", u)
-			})
+			// Printed BEFORE the browser is attempted, and always. This flow
+			// exists so that the browser and the CLI need not be on the same
+			// machine, so on the machines it was added for there is no
+			// browser to open at all.
+			fmt.Fprintf(out, "Open this URL to sign in:\n\n  %s\n\n", req.AuthorizationURL)
+			_ = oauth.OpenBrowser(req.AuthorizationURL)
+
+			code, err := promptForCode(cmd, out)
+			if err != nil {
+				return err
+			}
+			toks, err := req.Redeem(ctx, client, meta.TokenEndpoint, code)
 			if err != nil {
 				return err
 			}
@@ -140,6 +164,29 @@ func runLoginCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&region, "set-region", "", "region to store in the profile")
 	f.StringVar(&accountID, "set-account-id", "", "account to store in the profile (--api-key only)")
 	return cmd
+}
+
+// promptForCode reads the code the console displayed.
+//
+// Read from the command's input rather than os.Stdin directly, so a test can
+// drive it — and so a code piped in (`echo $CODE | basaltic login`) works the
+// same as one typed, which is the shape a script on a remote box ends up
+// using.
+//
+// It is NOT read as a password. Hiding it would stop the user seeing that
+// their paste arrived whole, and the code is single-use and expiring, not a
+// standing credential worth keeping off the screen.
+func promptForCode(cmd *cobra.Command, out io.Writer) (string, error) {
+	fmt.Fprint(out, "Paste the code shown in the browser: ")
+	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
+	code := strings.TrimSpace(line)
+	if err != nil && code == "" {
+		if errors.Is(err, io.EOF) {
+			return "", errors.New("no code was entered")
+		}
+		return "", fmt.Errorf("read the code: %w", err)
+	}
+	return code, nil
 }
 
 // iamEndpoint resolves the IAM base URL the same way every other call does, so
