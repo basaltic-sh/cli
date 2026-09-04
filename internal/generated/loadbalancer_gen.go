@@ -293,7 +293,6 @@ func newLoadbalancerListenerDeleteCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.AttachListenerCertificateRequest
 	var bodyFile string
-	var chainPemFlag string
 	var isDefaultFlag bool
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -310,9 +309,6 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
 				}
-			}
-			if cmd.Flags().Changed("chain-pem") {
-				body.ChainPEM = &chainPemFlag
 			}
 			if cmd.Flags().Changed("is-default") {
 				body.IsDefault = &isDefaultFlag
@@ -331,14 +327,9 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.CertificateCRN, "certificate-crn", "", "Certificate crn")
+	f.StringVar(&body.CertificateCRN, "certificate-crn", "", "The certificate to serve, by CRN")
 	_ = cmd.MarkFlagRequired("certificate-crn")
-	f.StringVar(&body.CertificatePEM, "certificate-pem", "", "Certificate pem")
-	_ = cmd.MarkFlagRequired("certificate-pem")
-	f.StringVar(&chainPemFlag, "chain-pem", "", "Chain pem")
 	f.BoolVar(&isDefaultFlag, "is-default", false, "When true, demote whatever's currently default and promote this cert in the same transaction")
-	f.StringVar(&body.PrivateKeyPEM, "private-key-pem", "", "Private key pem")
-	_ = cmd.MarkFlagRequired("private-key-pem")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

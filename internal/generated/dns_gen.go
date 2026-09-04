@@ -251,6 +251,7 @@ func newDnsZoneCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newDnsZoneUpdateCommand(state))
 	cmd.AddCommand(newDnsZoneDeleteCommand(state))
 	cmd.AddCommand(newDnsZoneAssociateVpcAssociationCommand(state))
+	cmd.AddCommand(newDnsZoneDeleteRecordImportCommand(state))
 	cmd.AddCommand(newDnsZoneDissociateVpcAssociationCommand(state))
 	cmd.AddCommand(newDnsZoneExportCommand(state))
 	cmd.AddCommand(newDnsZoneGetRecordImportCommand(state))
@@ -481,6 +482,29 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.VPCID, "vpc-id", "", "VPC to associate with this private zone")
 	_ = cmd.MarkFlagRequired("vpc-id")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
+	return cmd
+}
+
+// newDnsZoneDeleteRecordImportCommand builds `basaltic dns zone delete-record-import`.
+func newDnsZoneDeleteRecordImportCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete-record-import <zone-id>",
+		Short: "Discard the record-import outcome",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := dnsClient(state)
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteZoneRecordImport(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			state.Printer().Done("Delete record import requested.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
