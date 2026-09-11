@@ -62,6 +62,7 @@ func newIamAccountCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newIamAccountCreateCommand(state))
 	cmd.AddCommand(newIamAccountUpdateCommand(state))
 	cmd.AddCommand(newIamAccountDeleteCommand(state))
+	cmd.AddCommand(newIamAccountGetResourceCommand(state))
 	return cmd
 }
 
@@ -224,6 +225,29 @@ func newIamAccountDeleteCommand(state *cli.State) *cobra.Command {
 			}
 			state.Printer().Done("Deleted.")
 			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newIamAccountGetResourceCommand builds `basaltic iam account get-resource`.
+func newIamAccountGetResourceCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-resource <account-id>",
+		Short: "Check account resource presence",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state)
+			if err != nil {
+				return err
+			}
+			out, err := c.GetAccountResources(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
 		},
 	}
 	f := cmd.Flags()
@@ -820,7 +844,7 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("code-challenge-method")
 	f.StringVar(&body.OrganizationID, "organization-id", "", "Which organization the resulting session is scoped to")
 	_ = cmd.MarkFlagRequired("organization-id")
-	f.StringVar(&body.RedirectURI, "redirect-uri", "", "Where to deliver the code")
+	f.StringVar(&body.RedirectURI, "redirect-uri", "", "For the CLI this must be urn:ietf:wg:oauth:2.0:oob — the out-of-band pseudo-redirect, meaning the code is DISPLAYED rather than delivered anywhere")
 	_ = cmd.MarkFlagRequired("redirect-uri")
 	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
 	return cmd
@@ -2765,7 +2789,7 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Requested token lifetime")
 	f.StringVar(&body.GrantType, "grant-type", "", "client_credentials is the one to use for a service account: it exchanges an access key pair for a token, and needs nothing else (one of: client_credentials, authorization_code, refresh_token)")
 	_ = cmd.MarkFlagRequired("grant-type")
-	f.StringVar(&redirectUriFlag, "redirect-uri", "", "The same redirect_uri the code was issued for")
+	f.StringVar(&redirectUriFlag, "redirect-uri", "", "The same redirect_uri the code was issued for — for the CLI, urn:ietf:wg:oauth:2.0:oob")
 	f.StringVar(&refreshTokenFlag, "refresh-token", "", "refresh_token grant only")
 	return cmd
 }

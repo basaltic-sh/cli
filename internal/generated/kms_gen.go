@@ -184,7 +184,6 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 	var body kms.UpdateKeyRequest
 	var bodyFile string
 	var descriptionFlag string
-	var nameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <key-id>",
@@ -203,9 +202,6 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -222,7 +218,6 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -420,7 +415,7 @@ func newKmsKeyGenerateDataKeyCommand(state *cli.State) *cobra.Command {
 func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 	var body kms.ScheduleKeyDeletionRequest
 	var bodyFile string
-	var pendingWindowInDaysFlag int
+	var recoveryWindowDaysFlag int
 	cmd := &cobra.Command{
 		Use:   "schedule-deletion <key-id>",
 		Short: "Schedule key for deletion",
@@ -435,8 +430,8 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("pending-window-in-days") {
-				body.PendingWindowInDays = &pendingWindowInDaysFlag
+			if cmd.Flags().Changed("recovery-window-days") {
+				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
 			out, err := c.ScheduleKeyDeletion(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -448,7 +443,7 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.IntVar(&pendingWindowInDaysFlag, "pending-window-in-days", 0, "How long the key sits in pending_deletion before it is hard-deleted")
+	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "How long the key sits in pending_deletion before it is hard-deleted")
 	return cmd
 }
 

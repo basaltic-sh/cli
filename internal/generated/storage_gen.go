@@ -1363,7 +1363,6 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 	var body storage.SnapshotUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
-	var nameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <snapshot-id>",
@@ -1382,9 +1381,6 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -1401,7 +1397,6 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -1581,7 +1576,6 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 	var descriptionFlag string
 	var enabledFlag bool
 	var intervalMinutesFlag int
-	var nameFlag string
 	var retentionCountFlag int
 	var retentionDaysFlag int
 	var tagsFlag string
@@ -1608,9 +1602,6 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("interval-minutes") {
 				body.IntervalMinutes = &intervalMinutesFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if cmd.Flags().Changed("retention-count") {
 				body.RetentionCount = &retentionCountFlag
 			}
@@ -1635,7 +1626,6 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.BoolVar(&enabledFlag, "enabled", false, "false pauses the policy, true resumes it")
 	f.IntVar(&intervalMinutesFlag, "interval-minutes", 0, "Interval minutes")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.IntVar(&retentionCountFlag, "retention-count", 0, "Retention count")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Retention days")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
@@ -1814,7 +1804,6 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 	var body storage.VolumeUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
-	var nameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <volume-id>",
@@ -1833,9 +1822,6 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -1852,7 +1838,6 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }

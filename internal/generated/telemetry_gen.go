@@ -836,6 +836,8 @@ func newTelemetryTraceSettingsCommand(state *cli.State) *cobra.Command {
 		Aliases: []string{"trace-settingses"},
 	}
 	cmd.AddCommand(newTelemetryTraceSettingsGetCommand(state))
+	cmd.AddCommand(newTelemetryTraceSettingsDeleteCommand(state))
+	cmd.AddCommand(newTelemetryTraceSettingsGetRetainedDataCommand(state))
 	cmd.AddCommand(newTelemetryTraceSettingsSetCommand(state))
 	return cmd
 }
@@ -852,6 +854,52 @@ func newTelemetryTraceSettingsGetCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			out, err := c.GetTraceSettings(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newTelemetryTraceSettingsDeleteCommand builds `basaltic telemetry trace-settings delete`.
+func newTelemetryTraceSettingsDeleteCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete trace settings",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state)
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteTraceSettings(cmd.Context()); err != nil {
+				return err
+			}
+			state.Printer().Done("Deleted.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newTelemetryTraceSettingsGetRetainedDataCommand builds `basaltic telemetry trace-settings get-retained-data`.
+func newTelemetryTraceSettingsGetRetainedDataCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-retained-data",
+		Short: "Check retained telemetry presence",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state)
+			if err != nil {
+				return err
+			}
+			out, err := c.GetRetainedTelemetryPresence(cmd.Context())
 			if err != nil {
 				return err
 			}

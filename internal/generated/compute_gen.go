@@ -123,6 +123,7 @@ func newComputeImageCommand(state *cli.State) *cobra.Command {
 func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	var params compute.ListImagesParams
 	var allVersionsFlag bool
+	var includeHiddenFlag bool
 	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -136,6 +137,9 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("all-versions") {
 				params.AllVersions = &allVersionsFlag
+			}
+			if cmd.Flags().Changed("include-hidden") {
+				params.IncludeHidden = &includeHiddenFlag
 			}
 			if fetchAll {
 				return state.Printer().Iter(c.ListImagesAll(cmd.Context(), &params))
@@ -151,6 +155,7 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.BoolVar(&allVersionsFlag, "all-versions", false, "Include builds a newer version has superseded")
 	f.StringVar(&params.Architecture, "architecture", "", "Architecture")
+	f.BoolVar(&includeHiddenFlag, "include-hidden", false, "Include the requesting account's hidden images for cleanup discovery")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Substring match on name")
@@ -441,12 +446,12 @@ func newComputeInstanceListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar((*string)(&params.CurrentState), "current-state", "", "Filter by where the instances actually are (one of: pending, building, running, stopping, stopped, rebooting, migrating, deleting, deleted, error)")
 	f.StringVar(&params.FlavorID, "flavor-id", "", "Filter by flavor ID")
 	f.StringVar(&params.ImageID, "image-id", "", "Filter by image ID")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
-	f.StringVar((*string)(&params.VMState), "vm-state", "", "Filter by lifecycle state (one of: pending, building, running, stopping, stopped, rebooting, deleting, deleted, error)")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -478,10 +483,6 @@ func newComputeInstanceGetCommand(state *cli.State) *cobra.Command {
 func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstanceCreateRequest
 	var bodyFile string
-	var assignPublicIpFlag bool
-	var bootVolumeSizeGbFlag int
-	var bootVolumeTypeFlag string
-	var dataVolumesFlag string
 	var descriptionFlag string
 	var iamRoleIdFlag string
 	var imageIdFlag string
@@ -504,20 +505,6 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 			if bodyFile != "" {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
-				}
-			}
-			if cmd.Flags().Changed("assign-public-ip") {
-				body.AssignPublicIP = &assignPublicIpFlag
-			}
-			if cmd.Flags().Changed("boot-volume-size-gb") {
-				body.BootVolumeSizeGB = &bootVolumeSizeGbFlag
-			}
-			if cmd.Flags().Changed("boot-volume-type") {
-				body.BootVolumeType = &bootVolumeTypeFlag
-			}
-			if dataVolumesFlag != "" {
-				if err := json.Unmarshal([]byte(dataVolumesFlag), &body.DataVolumes); err != nil {
-					return fmt.Errorf("--data-volumes: %w", err)
 				}
 			}
 			if cmd.Flags().Changed("description") {
@@ -566,10 +553,6 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&assignPublicIpFlag, "assign-public-ip", false, "The older, instance-wide spelling of networks[0].assign_public_ip, and it means the primary NIC — the only interface it could ever have addressed")
-	f.IntVar(&bootVolumeSizeGbFlag, "boot-volume-size-gb", 0, "Boot disk size cloned from the image; omitted = the image's min_disk_gb")
-	f.StringVar(&bootVolumeTypeFlag, "boot-volume-type", "", "Boot disk tier; omitted = the region default (one of: ssd, nvme)")
-	f.StringVar(&dataVolumesFlag, "data-volumes", "", "Blank data volumes created and bound with the instance (JSON)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.FlavorID, "flavor-id", "", "Flavor ID")
 	_ = cmd.MarkFlagRequired("flavor-id")
@@ -579,11 +562,12 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
 	f.StringVar(&body.Name, "name", "", "Name")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&networksFlag, "networks", "", "Networks to attach (JSON)")
+	f.StringVar(&networksFlag, "networks", "", "Interfaces to attach, at least one (JSON)")
+	_ = cmd.MarkFlagRequired("networks")
 	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security group names or IDs")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&userDataFlag, "user-data", "", "Base64-encoded user data (cloud-init)")
-	f.StringVar(&volumesFlag, "volumes", "", "Volume attachments for boot from volume (JSON)")
+	f.StringVar(&volumesFlag, "volumes", "", "Disks created and bound with the instance, the boot disk included — mark it with boot: true (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1251,23 +1235,12 @@ func newComputeInstancePoolGetCommand(state *cli.State) *cobra.Command {
 func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstancePoolCreateRequest
 	var bodyFile string
-	var assignPublicIpFlag bool
-	var bootVolumeSizeGbFlag int
-	var bootVolumeTypeFlag string
-	var dataVolumesFlag string
 	var descriptionFlag string
 	var desiredCountFlag int
-	var extraNiCsFlag string
-	var flavorIdFlag string
-	var iamRoleIdFlag string
-	var imageIdFlag string
 	var maxCountFlag int
-	var metadataFlag string
 	var minCountFlag int
-	var subnetIdFlag string
 	var tagsFlag string
 	var templateFlag string
-	var userDataFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -1284,53 +1257,17 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("assign-public-ip") {
-				body.AssignPublicIP = &assignPublicIpFlag
-			}
-			if cmd.Flags().Changed("boot-volume-size-gb") {
-				body.BootVolumeSizeGB = &bootVolumeSizeGbFlag
-			}
-			if cmd.Flags().Changed("boot-volume-type") {
-				body.BootVolumeType = &bootVolumeTypeFlag
-			}
-			if dataVolumesFlag != "" {
-				if err := json.Unmarshal([]byte(dataVolumesFlag), &body.DataVolumes); err != nil {
-					return fmt.Errorf("--data-volumes: %w", err)
-				}
-			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
 			if cmd.Flags().Changed("desired-count") {
 				body.DesiredCount = &desiredCountFlag
 			}
-			if extraNiCsFlag != "" {
-				if err := json.Unmarshal([]byte(extraNiCsFlag), &body.ExtraNICs); err != nil {
-					return fmt.Errorf("--extra-nics: %w", err)
-				}
-			}
-			if cmd.Flags().Changed("flavor-id") {
-				body.FlavorID = &flavorIdFlag
-			}
-			if cmd.Flags().Changed("iam-role-id") {
-				body.IAMRoleID = &iamRoleIdFlag
-			}
-			if cmd.Flags().Changed("image-id") {
-				body.ImageID = &imageIdFlag
-			}
 			if cmd.Flags().Changed("max-count") {
 				body.MaxCount = &maxCountFlag
 			}
-			if metadataFlag != "" {
-				if err := json.Unmarshal([]byte(metadataFlag), &body.Metadata); err != nil {
-					return fmt.Errorf("--metadata: %w", err)
-				}
-			}
 			if cmd.Flags().Changed("min-count") {
 				body.MinCount = &minCountFlag
-			}
-			if cmd.Flags().Changed("subnet-id") {
-				body.SubnetID = &subnetIdFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1341,9 +1278,6 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 				if err := json.Unmarshal([]byte(templateFlag), &body.Template); err != nil {
 					return fmt.Errorf("--template: %w", err)
 				}
-			}
-			if userDataFlag != "" {
-				body.UserData = []byte(userDataFlag)
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1359,27 +1293,15 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&assignPublicIpFlag, "assign-public-ip", false, "Superseded by template.assign_public_ip")
-	f.IntVar(&bootVolumeSizeGbFlag, "boot-volume-size-gb", 0, "Superseded by template.boot_volume_size_gb")
-	f.StringVar(&bootVolumeTypeFlag, "boot-volume-type", "", "Superseded by template.boot_volume_type (one of: ssd, nvme)")
-	f.StringVar(&dataVolumesFlag, "data-volumes", "", "Superseded by template.data_volumes (JSON)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "Desired count")
-	f.StringVar(&extraNiCsFlag, "extra-nics", "", "Superseded by template.networks[1:] (JSON)")
-	f.StringVar(&flavorIdFlag, "flavor-id", "", "Superseded by template.flavor_id")
-	f.StringVar(&iamRoleIdFlag, "iam-role-id", "", "Superseded by template.iam_role_id")
-	f.StringVar(&imageIdFlag, "image-id", "", "Superseded by template.image_id")
-	f.StringSliceVar(&body.KeypairNames, "keypair-names", nil, "Superseded by template.key_names")
 	f.IntVar(&maxCountFlag, "max-count", 0, "Max count")
-	f.StringVar(&metadataFlag, "metadata", "", "Superseded by template.metadata (JSON)")
 	f.IntVar(&minCountFlag, "min-count", 0, "Min count")
 	f.StringVar(&body.Name, "name", "", "Name")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringSliceVar(&body.SecurityGroupIDs, "security-group-ids", nil, "Superseded by template.networks[0].security_group_ids")
-	f.StringVar(&subnetIdFlag, "subnet-id", "", "Superseded by template.networks[0].subnet_id")
 	f.StringVar(&tagsFlag, "tags", "", "Labels on the pool resource, for IAM conditions (basalt:RequestTag/<key> here, basalt:ResourceTag/<key> on later operations) and cost attribution (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Template (JSON)")
-	f.StringVar(&userDataFlag, "user-data", "", "Superseded by template.user_data")
+	_ = cmd.MarkFlagRequired("template")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

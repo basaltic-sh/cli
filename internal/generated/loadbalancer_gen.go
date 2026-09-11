@@ -111,13 +111,9 @@ func newLoadbalancerListenerGetCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.CreateListenerRequest
 	var bodyFile string
-	var certificateCrnFlag string
-	var certificatePemFlag string
 	var certificatesFlag string
-	var chainPemFlag string
 	var defaultTargetGroupIdFlag string
 	var exposureFlag string
-	var privateKeyPemFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -135,28 +131,16 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("certificate-crn") {
-				body.CertificateCRN = &certificateCrnFlag
-			}
-			if cmd.Flags().Changed("certificate-pem") {
-				body.CertificatePEM = &certificatePemFlag
-			}
 			if certificatesFlag != "" {
 				if err := json.Unmarshal([]byte(certificatesFlag), &body.Certificates); err != nil {
 					return fmt.Errorf("--certificates: %w", err)
 				}
-			}
-			if cmd.Flags().Changed("chain-pem") {
-				body.ChainPEM = &chainPemFlag
 			}
 			if cmd.Flags().Changed("default-target-group-id") {
 				body.DefaultTargetGroupID = &defaultTargetGroupIdFlag
 			}
 			if cmd.Flags().Changed("exposure") {
 				body.Exposure = &exposureFlag
-			}
-			if cmd.Flags().Changed("private-key-pem") {
-				body.PrivateKeyPEM = &privateKeyPemFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -177,15 +161,11 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&certificateCrnFlag, "certificate-crn", "", "Deprecated — use certificates[]")
-	f.StringVar(&certificatePemFlag, "certificate-pem", "", "Deprecated — use certificates[]")
 	f.StringVar(&certificatesFlag, "certificates", "", "Certificates (JSON)")
-	f.StringVar(&chainPemFlag, "chain-pem", "", "Deprecated — use certificates[]")
 	f.StringVar(&defaultTargetGroupIdFlag, "default-target-group-id", "", "Default target group id")
 	f.StringVar(&exposureFlag, "exposure", "", "Which LB addresses are bound (one of: public_only, private_only, both)")
 	f.IntVar(&body.Port, "port", 0, "Port")
 	_ = cmd.MarkFlagRequired("port")
-	f.StringVar(&privateKeyPemFlag, "private-key-pem", "", "Deprecated — use certificates[]")
 	f.StringVar(&body.Protocol, "protocol", "", "Protocol (one of: http, https, tcp, udp)")
 	_ = cmd.MarkFlagRequired("protocol")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
@@ -198,12 +178,9 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateListenerRequest
 	var bodyFile string
 	var certificateCrnFlag string
-	var certificatePemFlag string
-	var chainPemFlag string
 	var clearDefaultTargetGroupFlag bool
 	var defaultTargetGroupIdFlag string
 	var exposureFlag string
-	var privateKeyPemFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <id> <listener-id>",
@@ -222,12 +199,6 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("certificate-crn") {
 				body.CertificateCRN = &certificateCrnFlag
 			}
-			if cmd.Flags().Changed("certificate-pem") {
-				body.CertificatePEM = &certificatePemFlag
-			}
-			if cmd.Flags().Changed("chain-pem") {
-				body.ChainPEM = &chainPemFlag
-			}
 			if cmd.Flags().Changed("clear-default-target-group") {
 				body.ClearDefaultTargetGroup = &clearDefaultTargetGroupFlag
 			}
@@ -236,9 +207,6 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("exposure") {
 				body.Exposure = &exposureFlag
-			}
-			if cmd.Flags().Changed("private-key-pem") {
-				body.PrivateKeyPEM = &privateKeyPemFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -256,12 +224,9 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&certificateCrnFlag, "certificate-crn", "", "Certificate crn")
-	f.StringVar(&certificatePemFlag, "certificate-pem", "", "Certificate pem")
-	f.StringVar(&chainPemFlag, "chain-pem", "", "Chain pem")
 	f.BoolVar(&clearDefaultTargetGroupFlag, "clear-default-target-group", false, "Clear default target group")
 	f.StringVar(&defaultTargetGroupIdFlag, "default-target-group-id", "", "Default target group id")
 	f.StringVar(&exposureFlag, "exposure", "", "Mutate which addresses are bound (one of: public_only, private_only, both)")
-	f.StringVar(&privateKeyPemFlag, "private-key-pem", "", "Private key pem")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -502,7 +467,6 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateLoadBalancerRequest
 	var bodyFile string
 	var flavorIdFlag string
-	var nameFlag string
 	var replicaCountFlag int
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -521,9 +485,6 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("flavor-id") {
 				body.FlavorID = &flavorIdFlag
-			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
 			}
 			if cmd.Flags().Changed("replica-count") {
 				body.ReplicaCount = &replicaCountFlag
@@ -544,7 +505,6 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&flavorIdFlag, "flavor-id", "", "Resize each replica to a different compute flavor")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.IntVar(&replicaCountFlag, "replica-count", 0, "Resize the set of load balancer instances")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -608,7 +568,6 @@ func newLoadbalancerRuleCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newLoadbalancerRuleCreateCommand(state))
 	cmd.AddCommand(newLoadbalancerRuleUpdateCommand(state))
 	cmd.AddCommand(newLoadbalancerRuleDeleteCommand(state))
-	cmd.AddCommand(newLoadbalancerRuleDeleteOrphanedCommand(state))
 	return cmd
 }
 
@@ -766,29 +725,6 @@ func newLoadbalancerRuleDeleteCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			state.Printer().Done("Deleted.")
-			return nil
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	return cmd
-}
-
-// newLoadbalancerRuleDeleteOrphanedCommand builds `basaltic loadbalancer rule delete-orphaned`.
-func newLoadbalancerRuleDeleteOrphanedCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete-orphaned <id> <rule-id>",
-		Short: "Delete a rule (superseded)",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
-			if err != nil {
-				return err
-			}
-			if err := c.DeleteRule(cmd.Context(), args[0], args[1]); err != nil {
-				return err
-			}
-			state.Printer().Done("Delete orphaned requested.")
 			return nil
 		},
 	}
@@ -962,7 +898,6 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateTargetGroupRequest
 	var bodyFile string
 	var healthCheckFlag string
-	var nameFlag string
 	var proxyProtocolFlag bool
 	var sessionAffinityFlag string
 	var tagsFlag string
@@ -984,9 +919,6 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 				if err := json.Unmarshal([]byte(healthCheckFlag), &body.HealthCheck); err != nil {
 					return fmt.Errorf("--health-check: %w", err)
 				}
-			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
 			}
 			if cmd.Flags().Changed("proxy-protocol") {
 				body.ProxyProtocol = &proxyProtocolFlag
@@ -1012,7 +944,6 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&healthCheckFlag, "health-check", "", "Health check (JSON)")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.BoolVar(&proxyProtocolFlag, "proxy-protocol", false, "Toggle PROXY v2 framing on upstream connections")
 	f.StringVar(&sessionAffinityFlag, "session-affinity", "", "Replaces the stickiness config (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
