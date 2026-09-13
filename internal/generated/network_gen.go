@@ -92,8 +92,10 @@ func newNetworkEgressOnlyGatewayListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -166,11 +168,11 @@ func newNetworkEgressOnlyGatewayCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.VPCID, "vpc-id", "", "The VPC must have an IPv6 CIDR (an egress-only gateway only routes v6)")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -284,8 +286,10 @@ func newNetworkFloatingIpListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -318,6 +322,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 	var body network.FloatingIPCreateRequest
 	var bodyFile string
 	var descriptionFlag string
+	var familyFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -337,6 +342,9 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
+			}
+			if cmd.Flags().Changed("family") {
+				body.Family = (*network.IPFamily)(&familyFlag)
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -358,6 +366,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&familyFlag, "family", "", "Which family to allocate in (one of: ipv4, ipv6)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -463,8 +472,8 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.InterfaceID, "interface-id", "", "Interface id")
-	_ = cmd.MarkFlagRequired("interface-id")
+	f.StringVar(&body.Interface, "interface", "", "Interface UUID or nested CRN")
+	_ = cmd.MarkFlagRequired("interface")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -473,7 +482,7 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
 	var body network.DetachFloatingIPRequest
 	var bodyFile string
-	var interfaceIdFlag string
+	var interfaceFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "detach <floating-ip-id>",
@@ -490,8 +499,8 @@ func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("interface-id") {
-				body.InterfaceID = &interfaceIdFlag
+			if cmd.Flags().Changed("interface") {
+				body.Interface = &interfaceFlag
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -507,7 +516,7 @@ func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&interfaceIdFlag, "interface-id", "", "The member to remove")
+	f.StringVar(&interfaceFlag, "interface", "", "Interface UUID or nested CRN; bare names, null and empty references are rejected")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -555,10 +564,12 @@ func newNetworkInterfaceListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
-	f.StringVar(&params.SubnetID, "subnet-id", "", "Subnet id")
-	f.StringVar(&params.VPCID, "vpc-id", "", "Vpc id")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.StringVar(&params.Subnet, "subnet", "", "Subnet UUID or nested CRN; an exact bare name requires the vpc filter")
+	f.StringVar(&params.VPC, "vpc", "", "VPC UUID, CRN or exact account-scoped name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -641,10 +652,10 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&ipAddressFlag, "ip-address", "", "Defaults to the next free address in the subnet")
 	f.StringVar(&macFlag, "mac", "", "Defaults to a fresh locally-administered EUI-48")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&body.SubnetID, "subnet-id", "", "Subnet id")
-	_ = cmd.MarkFlagRequired("subnet-id")
+	f.StringVar(&body.Subnet, "subnet", "", "Subnet UUID or nested CRN (vpc/<vpc>/subnet/<subnet>)")
+	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -718,6 +729,7 @@ func newNetworkInterfaceDeleteCommand(state *cli.State) *cobra.Command {
 
 // newNetworkInterfaceListSecurityGroupsCommand builds `basaltic network interface list-security-groups`.
 func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Command {
+	var params network.ListInterfaceSecurityGroupsParams
 	cmd := &cobra.Command{
 		Use:   "list-security-groups <interface-id>",
 		Short: "List interface security-group membership",
@@ -727,7 +739,7 @@ func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Comma
 			if err != nil {
 				return err
 			}
-			page, err := c.ListInterfaceSecurityGroups(cmd.Context(), args[0])
+			page, err := c.ListInterfaceSecurityGroups(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -736,6 +748,8 @@ func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Comma
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	return cmd
 }
 
@@ -767,8 +781,8 @@ func newNetworkInterfaceSetSecurityGroupCommand(state *cli.State) *cobra.Command
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringSliceVar(&body.SecurityGroupIDs, "security-group-ids", nil, "Security group ids")
-	_ = cmd.MarkFlagRequired("security-group-ids")
+	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security-group UUIDs, CRNs or account-scoped names")
+	_ = cmd.MarkFlagRequired("security-groups")
 	return cmd
 }
 
@@ -815,8 +829,10 @@ func newNetworkInternetGatewayListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -889,7 +905,7 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -996,8 +1012,8 @@ func newNetworkInternetGatewayAttachCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.VPCID, "vpc-id", "", "VPC to attach this IGW to")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1073,10 +1089,12 @@ func newNetworkNatGatewayListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
-	f.StringVar(&params.SubnetID, "subnet-id", "", "Subnet id")
-	f.StringVar(&params.VPCID, "vpc-id", "", "Vpc id")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.StringVar(&params.Subnet, "subnet", "", "Subnet UUID or nested CRN; an exact bare name requires the vpc filter")
+	f.StringVar(&params.VPC, "vpc", "", "VPC UUID, CRN or exact account-scoped name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1149,10 +1167,10 @@ func newNetworkNatGatewayCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&body.SubnetID, "subnet-id", "", "Subnet the NAT GW lives in")
-	_ = cmd.MarkFlagRequired("subnet-id")
+	f.StringVar(&body.Subnet, "subnet", "", "Subnet UUID or nested CRN (vpc/<vpc>/subnet/<subnet>)")
+	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -1265,8 +1283,10 @@ func newNetworkRouteListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1300,10 +1320,10 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var descriptionFlag string
 	var tagsFlag string
-	var targetEgressOnlyGatewayIdFlag string
-	var targetInternetGatewayIdFlag string
+	var targetEgressOnlyGatewayFlag string
+	var targetInternetGatewayFlag string
 	var targetIpFlag string
-	var targetNatGatewayIdFlag string
+	var targetNatGatewayFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "create <route-table-id>",
@@ -1328,17 +1348,17 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("target-egress-only-gateway-id") {
-				body.TargetEgressOnlyGatewayID = &targetEgressOnlyGatewayIdFlag
+			if cmd.Flags().Changed("target-egress-only-gateway") {
+				body.TargetEgressOnlyGateway = &targetEgressOnlyGatewayFlag
 			}
-			if cmd.Flags().Changed("target-internet-gateway-id") {
-				body.TargetInternetGatewayID = &targetInternetGatewayIdFlag
+			if cmd.Flags().Changed("target-internet-gateway") {
+				body.TargetInternetGateway = &targetInternetGatewayFlag
 			}
 			if cmd.Flags().Changed("target-ip") {
 				body.TargetIP = &targetIpFlag
 			}
-			if cmd.Flags().Changed("target-nat-gateway-id") {
-				body.TargetNATGatewayID = &targetNatGatewayIdFlag
+			if cmd.Flags().Changed("target-nat-gateway") {
+				body.TargetNATGateway = &targetNatGatewayFlag
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1358,10 +1378,10 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.Destination, "destination", "", "Destination")
 	_ = cmd.MarkFlagRequired("destination")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&targetEgressOnlyGatewayIdFlag, "target-egress-only-gateway-id", "", "IPv6-only")
-	f.StringVar(&targetInternetGatewayIdFlag, "target-internet-gateway-id", "", "Target internet gateway id")
+	f.StringVar(&targetEgressOnlyGatewayFlag, "target-egress-only-gateway", "", "Gateway UUID, CRN or exact account-scoped name")
+	f.StringVar(&targetInternetGatewayFlag, "target-internet-gateway", "", "Gateway UUID, CRN or exact account-scoped name")
 	f.StringVar(&targetIpFlag, "target-ip", "", "Unicast next hop inside this VPC's CIDR (same IP family as destination)")
-	f.StringVar(&targetNatGatewayIdFlag, "target-nat-gateway-id", "", "Target nat gateway id")
+	f.StringVar(&targetNatGatewayFlag, "target-nat-gateway", "", "Gateway UUID, CRN or exact account-scoped name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1473,9 +1493,11 @@ func newNetworkRouteTableListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
-	f.StringVar(&params.VPCID, "vpc-id", "", "Filter by VPC ID")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.StringVar(&params.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1551,8 +1573,8 @@ func newNetworkRouteTableCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.Name, "name", "", "1-63 chars, lowercase alphanumeric + hyphen")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.VPCID, "vpc-id", "", "VPC this table belongs to")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1664,8 +1686,10 @@ func newNetworkSecurityGroupListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1738,7 +1762,7 @@ func newNetworkSecurityGroupCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -1851,8 +1875,10 @@ func newNetworkSecurityGroupRuleListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1889,7 +1915,7 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 	var portMaxFlag int
 	var portMinFlag int
 	var sourceCidrFlag string
-	var sourceSecurityGroupIdFlag string
+	var sourceSecurityGroupFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "create <security-group-id>",
@@ -1921,8 +1947,8 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("source-cidr") {
 				body.SourceCIDR = &sourceCidrFlag
 			}
-			if cmd.Flags().Changed("source-security-group-id") {
-				body.SourceSecurityGroupID = &sourceSecurityGroupIdFlag
+			if cmd.Flags().Changed("source-security-group") {
+				body.SourceSecurityGroup = &sourceSecurityGroupFlag
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1947,7 +1973,7 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar((*string)(&body.Protocol), "protocol", "", "Protocol (one of: tcp, udp, icmp, all)")
 	_ = cmd.MarkFlagRequired("protocol")
 	f.StringVar(&sourceCidrFlag, "source-cidr", "", "Source cidr")
-	f.StringVar(&sourceSecurityGroupIdFlag, "source-security-group-id", "", "Source security group id")
+	f.StringVar(&sourceSecurityGroupFlag, "source-security-group", "", "Security-group UUID, CRN or exact account-scoped name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2016,9 +2042,11 @@ func newNetworkSubnetListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
-	f.StringVar(&params.VPCID, "vpc-id", "", "Filter by VPC ID")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.StringVar(&params.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -2050,10 +2078,11 @@ func newNetworkSubnetGetCommand(state *cli.State) *cobra.Command {
 func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 	var body network.SubnetCreateRequest
 	var bodyFile string
+	var assignIPv6cidrFlag bool
 	var cidrv6Flag string
 	var descriptionFlag string
 	var gatewayIpFlag string
-	var routeTableIdFlag string
+	var routeTableFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -2071,6 +2100,9 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
+			if cmd.Flags().Changed("assign-ipv6-cidr") {
+				body.AssignIPv6CIDR = &assignIPv6cidrFlag
+			}
 			if cmd.Flags().Changed("cidr-v6") {
 				body.CIDRV6 = &cidrv6Flag
 			}
@@ -2080,8 +2112,8 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("gateway-ip") {
 				body.GatewayIP = &gatewayIpFlag
 			}
-			if cmd.Flags().Changed("route-table-id") {
-				body.RouteTableID = &routeTableIdFlag
+			if cmd.Flags().Changed("route-table") {
+				body.RouteTable = &routeTableFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -2102,17 +2134,18 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&assignIPv6cidrFlag, "assign-ipv6-cidr", false, "Allocate the lowest free IPv6 /64 inside the VPC's IPv6 CIDR")
 	f.StringVar(&body.CIDR, "cidr", "", "Cidr")
 	_ = cmd.MarkFlagRequired("cidr")
 	f.StringVar(&cidrv6Flag, "cidr-v6", "", "Makes the subnet dual-stack")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&gatewayIpFlag, "gateway-ip", "", "Defaults to the first usable host in the CIDR")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&routeTableIdFlag, "route-table-id", "", "Defaults to the VPC's main route table")
+	f.StringVar(&routeTableFlag, "route-table", "", "Route-table UUID, nested CRN or exact name within the subnet VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.VPCID, "vpc-id", "", "Vpc id")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2122,7 +2155,7 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	var body network.SubnetUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
-	var routeTableIdFlag string
+	var routeTableFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <subnet-id>",
@@ -2141,8 +2174,8 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("route-table-id") {
-				body.RouteTableID = &routeTableIdFlag
+			if cmd.Flags().Changed("route-table") {
+				body.RouteTable = &routeTableFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -2160,7 +2193,7 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&routeTableIdFlag, "route-table-id", "", "Re-associate the subnet with a different route table")
+	f.StringVar(&routeTableFlag, "route-table", "", "Route-table UUID, nested CRN or exact name within the subnet VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -2229,8 +2262,10 @@ func newNetworkVpcListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -2310,7 +2345,7 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.CIDRV4, "cidr-v4", "", "Must be private (RFC 1918): within 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16")
 	_ = cmd.MarkFlagRequired("cidr-v4")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")

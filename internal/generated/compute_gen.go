@@ -77,7 +77,9 @@ func newComputeFlavorListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
 	f.StringVar(&params.Family, "family", "", "Filter by product family")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	return cmd
 }
 
@@ -155,10 +157,11 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.BoolVar(&allVersionsFlag, "all-versions", false, "Include builds a newer version has superseded")
 	f.StringVar(&params.Architecture, "architecture", "", "Architecture")
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
 	f.BoolVar(&includeHiddenFlag, "include-hidden", false, "Include the requesting account's hidden images for cleanup discovery")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Substring match on name")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name match; an empty value matches no named resource")
 	f.StringVar(&params.OS, "os", "", "Os")
 	f.StringVar(&params.Status, "status", "", "One of: \"pending\", \"importing\", \"active\", \"error\", \"hidden\"")
 	f.StringVar(&params.Visibility, "visibility", "", "One of: \"public\", \"private\"")
@@ -305,7 +308,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 	var currentFlag bool
 	var descriptionFlag string
 	var eolDateFlag string
-	var nameFlag string
 	var tagsFlag string
 	var visibilityFlag string
 	cmd := &cobra.Command{
@@ -336,9 +338,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("eol-date") {
 				body.EOLDate = &eolDateFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -361,7 +360,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&currentFlag, "current", false, "Switch the resolve-by-name pointer for this image's name")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&eolDateFlag, "eol-date", "", "Set the release's end-of-life date")
-	f.StringVar(&nameFlag, "name", "", "Name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&visibilityFlag, "visibility", "", "Visibility (one of: public, private)")
 	return cmd
@@ -446,12 +444,13 @@ func newComputeInstanceListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar((*string)(&params.CurrentState), "current-state", "", "Filter by where the instances actually are (one of: pending, building, running, stopping, stopped, rebooting, migrating, deleting, deleted, error)")
-	f.StringVar(&params.FlavorID, "flavor-id", "", "Filter by flavor ID")
-	f.StringVar(&params.ImageID, "image-id", "", "Filter by image ID")
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar((*string)(&params.CurrentState), "current-state", "", "Filter by where the instances actually are (one of: pending, building, running, stopping, stopped, rebooting, migrating, deleting, deleted, error, crashed, paused, suspended)")
+	f.StringVar(&params.Flavor, "flavor", "", "Filter by flavor reference (UUID, CRN or name; images also accept name:version)")
+	f.StringVar(&params.Image, "image", "", "Filter by image reference (UUID, CRN or name; images also accept name:version)")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -483,9 +482,10 @@ func newComputeInstanceGetCommand(state *cli.State) *cobra.Command {
 func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstanceCreateRequest
 	var bodyFile string
+	var architectureFlag string
 	var descriptionFlag string
-	var iamRoleIdFlag string
-	var imageIdFlag string
+	var iamRoleFlag string
+	var imageFlag string
 	var metadataFlag string
 	var networksFlag string
 	var tagsFlag string
@@ -507,14 +507,17 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
+			if cmd.Flags().Changed("architecture") {
+				body.Architecture = &architectureFlag
+			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("iam-role-id") {
-				body.IAMRoleID = &iamRoleIdFlag
+			if cmd.Flags().Changed("iam-role") {
+				body.IAMRole = &iamRoleFlag
 			}
-			if cmd.Flags().Changed("image-id") {
-				body.ImageID = &imageIdFlag
+			if cmd.Flags().Changed("image") {
+				body.Image = &imageFlag
 			}
 			if metadataFlag != "" {
 				if err := json.Unmarshal([]byte(metadataFlag), &body.Metadata); err != nil {
@@ -553,18 +556,18 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&architectureFlag, "architecture", "", "Architecture for bare image names; a CRN pins its architecture")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.FlavorID, "flavor-id", "", "Flavor ID")
-	_ = cmd.MarkFlagRequired("flavor-id")
-	f.StringVar(&iamRoleIdFlag, "iam-role-id", "", "Attach this IAM role to the instance")
-	f.StringVar(&imageIdFlag, "image-id", "", "Image to clone the boot disk from (required if not booting from volume)")
-	f.StringSliceVar(&body.KeyNames, "key-names", nil, "SSH keypair names to authorize on the instance")
+	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name)")
+	_ = cmd.MarkFlagRequired("flavor")
+	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach this organization-scoped IAM role by UUID, CRN or exact name")
+	f.StringVar(&imageFlag, "image", "", "Image to clone the boot disk from (required if not booting from volume)")
+	f.StringSliceVar(&body.Keypairs, "keypairs", nil, "Keypairs")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&networksFlag, "networks", "", "Interfaces to attach, at least one (JSON)")
 	_ = cmd.MarkFlagRequired("networks")
-	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security group names or IDs")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&userDataFlag, "user-data", "", "Base64-encoded user data (cloud-init)")
 	f.StringVar(&volumesFlag, "volumes", "", "Disks created and bound with the instance, the boot disk included — mark it with boot: true (JSON)")
@@ -622,7 +625,7 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
-	f.StringVar(&nameFlag, "name", "", "Name")
+	f.StringVar(&nameFlag, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -654,10 +657,10 @@ func newComputeInstanceDeleteCommand(state *cli.State) *cobra.Command {
 func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 	var body compute.AttachInstanceNICRequest
 	var bodyFile string
-	var interfaceIdFlag string
+	var interfaceFlag string
 	var ipAddressFlag string
 	var macFlag string
-	var subnetIdFlag string
+	var subnetFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "attach-nic <instance-id>",
@@ -674,8 +677,8 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("interface-id") {
-				body.InterfaceID = &interfaceIdFlag
+			if cmd.Flags().Changed("interface") {
+				body.Interface = &interfaceFlag
 			}
 			if cmd.Flags().Changed("ip-address") {
 				body.IPAddress = &ipAddressFlag
@@ -683,8 +686,8 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("mac") {
 				body.MAC = &macFlag
 			}
-			if cmd.Flags().Changed("subnet-id") {
-				body.SubnetID = &subnetIdFlag
+			if cmd.Flags().Changed("subnet") {
+				body.Subnet = &subnetFlag
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -700,11 +703,11 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&interfaceIdFlag, "interface-id", "", "Existing standalone interface to attach")
+	f.StringVar(&interfaceFlag, "interface", "", "Existing standalone interface UUID or complete VPC/subnet/interface CRN")
 	f.StringVar(&ipAddressFlag, "ip-address", "", "Ip address")
 	f.StringVar(&macFlag, "mac", "", "Mac")
-	f.StringSliceVar(&body.SecurityGroupIDs, "security-group-ids", nil, "Security group ids")
-	f.StringVar(&subnetIdFlag, "subnet-id", "", "Subnet id")
+	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security groups")
+	f.StringVar(&subnetFlag, "subnet", "", "Subnet UUID or complete VPC/subnet CRN; a bare name requires a VPC parent and is rejected here")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -758,8 +761,8 @@ func newComputeInstanceAttachVolumeCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&deviceFlag, "device", "", "Optional device-name override; auto-picks the next free slot (vdb/vdc/…) when omitted")
 	f.StringVar(&fstypeFlag, "fstype", "", "Filesystem the in-guest agent formats the disk with, and only when mount_path is set and the disk is blank (one of: ext4, xfs)")
 	f.StringVar(&mountPathFlag, "mount-path", "", "When set, the in-guest agent formats the disk (only if blank) and mounts it at this path")
-	f.StringVar(&body.VolumeID, "volume-id", "", "Volume id")
-	_ = cmd.MarkFlagRequired("volume-id")
+	f.StringVar(&body.Volume, "volume", "", "Account-scoped volume reference (UUID, CRN or exact name)")
+	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -883,6 +886,7 @@ func newComputeInstanceDetachVolumeCommand(state *cli.State) *cobra.Command {
 
 // newComputeInstanceListNicsCommand builds `basaltic compute instance list-nics`.
 func newComputeInstanceListNicsCommand(state *cli.State) *cobra.Command {
+	var params compute.ListInstanceNiCsParams
 	cmd := &cobra.Command{
 		Use:   "list-nics <instance-id>",
 		Short: "List the instance's network interfaces",
@@ -892,7 +896,7 @@ func newComputeInstanceListNicsCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.ListInstanceNiCs(cmd.Context(), args[0])
+			out, err := c.ListInstanceNiCs(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -901,11 +905,14 @@ func newComputeInstanceListNicsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	return cmd
 }
 
 // newComputeInstanceListVolumesCommand builds `basaltic compute instance list-volumes`.
 func newComputeInstanceListVolumesCommand(state *cli.State) *cobra.Command {
+	var params compute.ListInstanceVolumesParams
 	cmd := &cobra.Command{
 		Use:   "list-volumes <instance-id>",
 		Short: "List the instance's attached volumes",
@@ -915,7 +922,7 @@ func newComputeInstanceListVolumesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.ListInstanceVolumes(cmd.Context(), args[0])
+			out, err := c.ListInstanceVolumes(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -924,6 +931,8 @@ func newComputeInstanceListVolumesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	return cmd
 }
 
@@ -974,7 +983,7 @@ func newComputeInstanceRebootCommand(state *cli.State) *cobra.Command {
 func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 	var body compute.ReinstallInstanceRequest
 	var bodyFile string
-	var imageIdFlag string
+	var imageFlag string
 	var sizeGbFlag int
 	var volumeTypeFlag string
 	var idempotencyKey string
@@ -993,8 +1002,8 @@ func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("image-id") {
-				body.ImageID = &imageIdFlag
+			if cmd.Flags().Changed("image") {
+				body.Image = &imageFlag
 			}
 			if cmd.Flags().Changed("size-gb") {
 				body.SizeGB = &sizeGbFlag
@@ -1016,7 +1025,7 @@ func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&imageIdFlag, "image-id", "", "Replacement image")
+	f.StringVar(&imageFlag, "image", "", "Replacement image reference (UUID, architecture-qualified CRN, name or name:version)")
 	f.IntVar(&sizeGbFlag, "size-gb", 0, "Replacement boot disk size; omitted = the image's min_disk_gb")
 	f.StringVar(&volumeTypeFlag, "volume-type", "", "Replacement boot disk tier; omitted = the region default (one of: ssd, nvme)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -1057,8 +1066,8 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.FlavorID, "flavor-id", "", "The target flavor to resize to")
-	_ = cmd.MarkFlagRequired("flavor-id")
+	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name) to resize to")
+	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1202,8 +1211,10 @@ func newComputeInstancePoolListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1297,7 +1308,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "Desired count")
 	f.IntVar(&maxCountFlag, "max-count", 0, "Max count")
 	f.IntVar(&minCountFlag, "min-count", 0, "Min count")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Labels on the pool resource, for IAM conditions (basalt:RequestTag/<key> here, basalt:ResourceTag/<key> on later operations) and cost attribution (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Template (JSON)")
@@ -1413,8 +1424,8 @@ func newComputeInstancePoolAttachFloatingIpCommand(state *cli.State) *cobra.Comm
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.FloatingIPID, "floating-ip-id", "", "An already-allocated floating IP of yours, currently attached to nothing")
-	_ = cmd.MarkFlagRequired("floating-ip-id")
+	f.StringVar(&body.FloatingIP, "floating-ip", "", "An account-scoped floating IP UUID or CRN (bare names are not accepted), currently attached to nothing")
+	_ = cmd.MarkFlagRequired("floating-ip")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1444,6 +1455,7 @@ func newComputeInstancePoolDetachFloatingIpCommand(state *cli.State) *cobra.Comm
 
 // newComputeInstancePoolListFloatingIpsCommand builds `basaltic compute instance-pool list-floating-ips`.
 func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Command {
+	var params compute.ListInstancePoolFloatingIPsParams
 	cmd := &cobra.Command{
 		Use:   "list-floating-ips <pool-id>",
 		Short: "List the pool's shared public addresses",
@@ -1453,7 +1465,7 @@ func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Comma
 			if err != nil {
 				return err
 			}
-			page, err := c.ListInstancePoolFloatingIPs(cmd.Context(), args[0])
+			page, err := c.ListInstancePoolFloatingIPs(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1462,11 +1474,14 @@ func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Comma
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	return cmd
 }
 
 // newComputeInstancePoolListInstancesCommand builds `basaltic compute instance-pool list-instances`.
 func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command {
+	var params compute.ListPoolInstancesParams
 	cmd := &cobra.Command{
 		Use:   "list-instances <pool-id>",
 		Short: "List a pool's instance bindings",
@@ -1476,7 +1491,7 @@ func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command
 			if err != nil {
 				return err
 			}
-			page, err := c.ListPoolInstances(cmd.Context(), args[0])
+			page, err := c.ListPoolInstances(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1485,6 +1500,8 @@ func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	return cmd
 }
 
@@ -1551,8 +1568,10 @@ func newComputeKeypairListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1624,7 +1643,7 @@ func newComputeKeypairCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&publicKeyFlag, "public-key", "", "SSH public key (if not provided, a new keypair will be generated)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")

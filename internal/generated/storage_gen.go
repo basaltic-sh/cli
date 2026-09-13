@@ -153,7 +153,7 @@ func newStorageBucketCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.BoolVar(&objectLockEnabledFlag, "object-lock-enabled", false, "When true, enables S3 Object Lock on the bucket at creation time and turns versioning on")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -171,11 +171,11 @@ func newStorageBucketDeleteCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteBucket(cmd.Context(), args[0]); err != nil {
+			out, err := c.DeleteBucket(cmd.Context(), args[0])
+			if err != nil {
 				return err
 			}
-			state.Printer().Done("Deleted.")
-			return nil
+			return state.Printer().Value(out)
 		},
 	}
 	f := cmd.Flags()
@@ -606,7 +606,7 @@ func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Command {
 	var body storage.PutBucketDeletionProtectionRequest
 	var bodyFile string
-	var recoveryDaysFlag int
+	var recoveryWindowDaysFlag int
 	cmd := &cobra.Command{
 		Use:   "set-deletion-protection <bucket>",
 		Short: "Set bucket deletion protection",
@@ -621,8 +621,8 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 					return err
 				}
 			}
-			if cmd.Flags().Changed("recovery-days") {
-				body.RecoveryDays = &recoveryDaysFlag
+			if cmd.Flags().Changed("recovery-window-days") {
+				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
 			if err := c.PutBucketDeletionProtection(cmd.Context(), args[0], &body); err != nil {
 				return err
@@ -636,7 +636,7 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&body.Enabled, "enabled", false, "When true, DeleteBucket schedules deletion instead of removing immediately")
 	_ = cmd.MarkFlagRequired("enabled")
-	f.IntVar(&recoveryDaysFlag, "recovery-days", 0, "Recovery window when enabling protection")
+	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "Whole days; omitted defaults to 7")
 	return cmd
 }
 
@@ -1349,7 +1349,7 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.VolumeID, "volume-id", "", "Volume id")
@@ -1786,7 +1786,7 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&bootableFlag, "bootable", false, "Bootable")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&body.SizeGB, "size-gb", 0, "Size gb")
 	_ = cmd.MarkFlagRequired("size-gb")

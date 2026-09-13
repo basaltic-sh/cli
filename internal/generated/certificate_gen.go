@@ -72,8 +72,10 @@ func newCertificateCertificateListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact certificate CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last certificate id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive certificate name within the caller's account")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }

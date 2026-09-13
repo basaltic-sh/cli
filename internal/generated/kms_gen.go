@@ -89,9 +89,10 @@ func newKmsKeyListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact KMS key CRN in the authenticated account and current region")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last key id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Optional substring filter on key name")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive account-scoped key name")
 	f.StringVar((*string)(&params.State), "state", "", "Optional state filter (enabled / disabled / pending_deletion) (one of: enabled, disabled, pending_deletion)")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd

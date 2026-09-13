@@ -63,6 +63,7 @@ func newLoadbalancerListenerCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerListenerListCommand builds `basaltic loadbalancer listener list`.
 func newLoadbalancerListenerListCommand(state *cli.State) *cobra.Command {
+	var params loadbalancer.ListListenersParams
 	cmd := &cobra.Command{
 		Use:   "list <id>",
 		Short: "List this load balancer's listeners",
@@ -72,7 +73,7 @@ func newLoadbalancerListenerListCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListListeners(cmd.Context(), args[0])
+			page, err := c.ListListeners(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -81,6 +82,8 @@ func newLoadbalancerListenerListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	return cmd
 }
 
@@ -112,7 +115,7 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.CreateListenerRequest
 	var bodyFile string
 	var certificatesFlag string
-	var defaultTargetGroupIdFlag string
+	var defaultTargetGroupFlag string
 	var exposureFlag string
 	var tagsFlag string
 	var idempotencyKey string
@@ -136,8 +139,8 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--certificates: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("default-target-group-id") {
-				body.DefaultTargetGroupID = &defaultTargetGroupIdFlag
+			if cmd.Flags().Changed("default-target-group") {
+				body.DefaultTargetGroup = &defaultTargetGroupFlag
 			}
 			if cmd.Flags().Changed("exposure") {
 				body.Exposure = &exposureFlag
@@ -162,7 +165,7 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&certificatesFlag, "certificates", "", "Certificates (JSON)")
-	f.StringVar(&defaultTargetGroupIdFlag, "default-target-group-id", "", "Default target group id")
+	f.StringVar(&defaultTargetGroupFlag, "default-target-group", "", "Default target group")
 	f.StringVar(&exposureFlag, "exposure", "", "Which LB addresses are bound (one of: public_only, private_only, both)")
 	f.IntVar(&body.Port, "port", 0, "Port")
 	_ = cmd.MarkFlagRequired("port")
@@ -177,9 +180,9 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateListenerRequest
 	var bodyFile string
-	var certificateCrnFlag string
+	var certificateFlag string
 	var clearDefaultTargetGroupFlag bool
-	var defaultTargetGroupIdFlag string
+	var defaultTargetGroupFlag string
 	var exposureFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -196,14 +199,14 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("certificate-crn") {
-				body.CertificateCRN = &certificateCrnFlag
+			if cmd.Flags().Changed("certificate") {
+				body.Certificate = &certificateFlag
 			}
 			if cmd.Flags().Changed("clear-default-target-group") {
 				body.ClearDefaultTargetGroup = &clearDefaultTargetGroupFlag
 			}
-			if cmd.Flags().Changed("default-target-group-id") {
-				body.DefaultTargetGroupID = &defaultTargetGroupIdFlag
+			if cmd.Flags().Changed("default-target-group") {
+				body.DefaultTargetGroup = &defaultTargetGroupFlag
 			}
 			if cmd.Flags().Changed("exposure") {
 				body.Exposure = &exposureFlag
@@ -223,9 +226,9 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&certificateCrnFlag, "certificate-crn", "", "Certificate crn")
+	f.StringVar(&certificateFlag, "certificate", "", "Certificate")
 	f.BoolVar(&clearDefaultTargetGroupFlag, "clear-default-target-group", false, "Clear default target group")
-	f.StringVar(&defaultTargetGroupIdFlag, "default-target-group-id", "", "Default target group id")
+	f.StringVar(&defaultTargetGroupFlag, "default-target-group", "", "Default target group")
 	f.StringVar(&exposureFlag, "exposure", "", "Mutate which addresses are bound (one of: public_only, private_only, both)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -292,8 +295,8 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.CertificateCRN, "certificate-crn", "", "The certificate to serve, by CRN")
-	_ = cmd.MarkFlagRequired("certificate-crn")
+	f.StringVar(&body.Certificate, "certificate", "", "The certificate to serve, by CRN, UUID or exact account-scoped name")
+	_ = cmd.MarkFlagRequired("certificate")
 	f.BoolVar(&isDefaultFlag, "is-default", false, "When true, demote whatever's currently default and promote this cert in the same transaction")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -302,7 +305,7 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 // newLoadbalancerListenerDetachCertificateCommand builds `basaltic loadbalancer listener detach-certificate`.
 func newLoadbalancerListenerDetachCertificateCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "detach-certificate <id> <listener-id> <certificate-crn>",
+		Use:   "detach-certificate <id> <listener-id> <certificate-id>",
 		Short: "Detach a certificate from an HTTPS listener",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -364,8 +367,10 @@ func newLoadbalancerLoadBalancerListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	f.StringVar(&params.Status, "status", "", "One of: \"provisioning\", \"active\", \"error\", \"deleting\"")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
@@ -398,7 +403,7 @@ func newLoadbalancerLoadBalancerGetCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.CreateLoadBalancerRequest
 	var bodyFile string
-	var floatingIpidFlag string
+	var floatingIpFlag string
 	var replicaCountFlag int
 	var tagsFlag string
 	var idempotencyKey string
@@ -417,8 +422,8 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("floating-ip-id") {
-				body.FloatingIPID = &floatingIpidFlag
+			if cmd.Flags().Changed("floating-ip") {
+				body.FloatingIP = &floatingIpFlag
 			}
 			if cmd.Flags().Changed("replica-count") {
 				body.ReplicaCount = &replicaCountFlag
@@ -442,22 +447,22 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.FlavorID, "flavor-id", "", "Compute flavor for each LB instance")
-	_ = cmd.MarkFlagRequired("flavor-id")
-	f.StringVar(&floatingIpidFlag, "floating-ip-id", "", "Optional FIP attached on create for public exposure")
-	f.StringSliceVar(&body.KeyNames, "key-names", nil, "Platform-operator break-glass only")
-	f.StringVar(&body.Name, "name", "", "1..127 chars of [A-Za-z0-9._-]")
+	f.StringVar(&body.Flavor, "flavor", "", "Compute flavor for each LB instance")
+	_ = cmd.MarkFlagRequired("flavor")
+	f.StringVar(&floatingIpFlag, "floating-ip", "", "Optional FIP attached on create for public exposure")
+	f.StringSliceVar(&body.Keypairs, "keypairs", nil, "Platform-operator break-glass only")
+	f.StringVar(&body.Name, "name", "", "1..127 chars of [A-Za-z0-9._-] Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&replicaCountFlag, "replica-count", 0, "Number of LB compute instances")
-	f.StringSliceVar(&body.SecurityGroupIDs, "security-group-ids", nil, "Security groups attached to every replica NIC (AWS ALB shape)")
-	_ = cmd.MarkFlagRequired("security-group-ids")
-	f.StringVar(&body.SubnetID, "subnet-id", "", "Subnet the LB instances attach to")
-	_ = cmd.MarkFlagRequired("subnet-id")
+	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security groups attached to every replica NIC (AWS ALB shape)")
+	_ = cmd.MarkFlagRequired("security-groups")
+	f.StringVar(&body.Subnet, "subnet", "", "Subnet the LB instances attach to")
+	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.Type, "type", "", "Type (one of: application, network)")
 	_ = cmd.MarkFlagRequired("type")
-	f.StringVar(&body.VPCID, "vpc-id", "", "VPC the LB will live in")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "VPC the LB will live in")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -466,12 +471,12 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateLoadBalancerRequest
 	var bodyFile string
-	var flavorIdFlag string
+	var flavorFlag string
 	var replicaCountFlag int
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <id>",
-		Short: "Rename, scale, or resize a load balancer",
+		Short: "Scale or resize a load balancer",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)
@@ -483,8 +488,8 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if cmd.Flags().Changed("flavor-id") {
-				body.FlavorID = &flavorIdFlag
+			if cmd.Flags().Changed("flavor") {
+				body.Flavor = &flavorFlag
 			}
 			if cmd.Flags().Changed("replica-count") {
 				body.ReplicaCount = &replicaCountFlag
@@ -504,7 +509,7 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&flavorIdFlag, "flavor-id", "", "Resize each replica to a different compute flavor")
+	f.StringVar(&flavorFlag, "flavor", "", "Resize each replica to a different compute flavor")
 	f.IntVar(&replicaCountFlag, "replica-count", 0, "Resize the set of load balancer instances")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -535,6 +540,7 @@ func newLoadbalancerLoadBalancerDeleteCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerLoadBalancerListReplicasCommand builds `basaltic loadbalancer load-balancer list-replicas`.
 func newLoadbalancerLoadBalancerListReplicasCommand(state *cli.State) *cobra.Command {
+	var params loadbalancer.ListLoadBalancerReplicasParams
 	cmd := &cobra.Command{
 		Use:   "list-replicas <id>",
 		Short: "List the LB's instance replicas with live health",
@@ -544,7 +550,7 @@ func newLoadbalancerLoadBalancerListReplicasCommand(state *cli.State) *cobra.Com
 			if err != nil {
 				return err
 			}
-			page, err := c.ListLoadBalancerReplicas(cmd.Context(), args[0])
+			page, err := c.ListLoadBalancerReplicas(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -553,6 +559,8 @@ func newLoadbalancerLoadBalancerListReplicasCommand(state *cli.State) *cobra.Com
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	return cmd
 }
 
@@ -573,6 +581,7 @@ func newLoadbalancerRuleCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerRuleListCommand builds `basaltic loadbalancer rule list`.
 func newLoadbalancerRuleListCommand(state *cli.State) *cobra.Command {
+	var params loadbalancer.ListRulesParams
 	cmd := &cobra.Command{
 		Use:   "list <id> <listener-id>",
 		Short: "List this listener's rules",
@@ -582,7 +591,7 @@ func newLoadbalancerRuleListCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListRules(cmd.Context(), args[0], args[1])
+			page, err := c.ListRules(cmd.Context(), args[0], args[1], &params)
 			if err != nil {
 				return err
 			}
@@ -591,6 +600,8 @@ func newLoadbalancerRuleListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	return cmd
 }
 
@@ -661,8 +672,8 @@ func newLoadbalancerRuleCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("conditions")
 	f.IntVar(&body.Priority, "priority", 0, "Priority")
 	_ = cmd.MarkFlagRequired("priority")
-	f.StringVar(&body.TargetGroupID, "target-group-id", "", "Target group id")
-	_ = cmd.MarkFlagRequired("target-group-id")
+	f.StringVar(&body.TargetGroup, "target-group", "", "Target group")
+	_ = cmd.MarkFlagRequired("target-group")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -705,8 +716,8 @@ func newLoadbalancerRuleUpdateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("conditions")
 	f.IntVar(&body.Priority, "priority", 0, "Priority")
 	_ = cmd.MarkFlagRequired("priority")
-	f.StringVar(&body.TargetGroupID, "target-group-id", "", "Target group id")
-	_ = cmd.MarkFlagRequired("target-group-id")
+	f.StringVar(&body.TargetGroup, "target-group", "", "Target group")
+	_ = cmd.MarkFlagRequired("target-group")
 	return cmd
 }
 
@@ -778,8 +789,10 @@ func newLoadbalancerTargetGroupListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	f.StringVar(&params.Protocol, "protocol", "", "One of: \"http\", \"https\", \"tcp\", \"udp\"")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
@@ -813,7 +826,7 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.CreateTargetGroupRequest
 	var bodyFile string
 	var healthCheckFlag string
-	var instancePoolIdFlag string
+	var instancePoolFlag string
 	var proxyProtocolFlag bool
 	var sessionAffinityFlag string
 	var tagsFlag string
@@ -840,8 +853,8 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--health-check: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("instance-pool-id") {
-				body.InstancePoolID = &instancePoolIdFlag
+			if cmd.Flags().Changed("instance-pool") {
+				body.InstancePool = &instancePoolFlag
 			}
 			if cmd.Flags().Changed("proxy-protocol") {
 				body.ProxyProtocol = &proxyProtocolFlag
@@ -877,8 +890,8 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&healthCheckFlag, "health-check", "", "Health check (JSON)")
-	f.StringVar(&instancePoolIdFlag, "instance-pool-id", "", "Compute instance pool to draw backends from")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&instancePoolFlag, "instance-pool", "", "Compute instance pool to draw backends from")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&body.Port, "port", 0, "Port")
 	_ = cmd.MarkFlagRequired("port")
@@ -1012,8 +1025,8 @@ func newLoadbalancerTargetGroupAttachTargetCommand(state *cli.State) *cobra.Comm
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&portFlag, "port", 0, "Port")
-	f.StringVar(&body.TargetRef, "target-ref", "", "Must match the group's target_type: an IP address for ip, a compute instance id for instance")
-	_ = cmd.MarkFlagRequired("target-ref")
+	f.StringVar(&body.Target, "target", "", "Must match the group's target_type: an IP address for ip, a compute instance UUID, CRN or exact account-scoped name for instance")
+	_ = cmd.MarkFlagRequired("target")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1066,6 +1079,7 @@ func newLoadbalancerTargetGroupGetTargetCommand(state *cli.State) *cobra.Command
 
 // newLoadbalancerTargetGroupListTargetsCommand builds `basaltic loadbalancer target-group list-targets`.
 func newLoadbalancerTargetGroupListTargetsCommand(state *cli.State) *cobra.Command {
+	var params loadbalancer.ListTargetsParams
 	cmd := &cobra.Command{
 		Use:   "list-targets <id>",
 		Short: "List targets in this group",
@@ -1075,7 +1089,7 @@ func newLoadbalancerTargetGroupListTargetsCommand(state *cli.State) *cobra.Comma
 			if err != nil {
 				return err
 			}
-			page, err := c.ListTargets(cmd.Context(), args[0])
+			page, err := c.ListTargets(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1084,5 +1098,7 @@ func newLoadbalancerTargetGroupListTargetsCommand(state *cli.State) *cobra.Comma
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact scoped CRN")
+	f.StringVar(&params.Name, "name", "", "Exact immutable name")
 	return cmd
 }

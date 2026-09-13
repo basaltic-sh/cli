@@ -88,7 +88,7 @@ func newDnsRecordListCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&includeManagedFlag, "include-managed", false, "Include the platform-stamped rows (SOA, apex NS, and the DNSSEC set) alongside your own")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last record id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Substring match on the record name")
+	f.StringVar(&params.Name, "name", "", "Exact record name, lowercased with an optional trailing dot removed")
 	f.StringVar(&params.Type, "type", "", "Exact record type to filter by (e.g")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
@@ -287,8 +287,10 @@ func newDnsZoneListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact dns/zone CRN with empty region and the caller's account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last zone id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact zone name, lowercased")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -378,8 +380,8 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.Name, "name", "", "Zone FQDN")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&visibilityFlag, "visibility", "", "private restricts the zone to the VPCs named in vpc_ids and requires at least one; public (the default) rejects vpc_ids outright rather than ignoring them (one of: public, private)")
-	f.StringSliceVar(&body.VPCIDs, "vpc-ids", nil, "VPCs the zone resolves in")
+	f.StringVar(&visibilityFlag, "visibility", "", "private restricts the zone to the VPCs named in vpcs and requires at least one; public (the default) rejects vpcs outright rather than ignoring them (one of: public, private)")
+	f.StringSliceVar(&body.VPCs, "vpcs", nil, "Account-owned VPC UUIDs or network/vpc CRNs the zone resolves in")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -479,8 +481,8 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.VPCID, "vpc-id", "", "VPC to associate with this private zone")
-	_ = cmd.MarkFlagRequired("vpc-id")
+	f.StringVar(&body.VPC, "vpc", "", "Account-owned VPC UUID or network/vpc CRN to associate with this private zone")
+	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

@@ -78,9 +78,11 @@ func newSecretsSecretListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact secret CRN in the calling account and current region")
 	f.BoolVar(&includeDeletedFlag, "include-deleted", false, "Include secrets in the recovery window")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum items to return")
 	f.StringVar(&params.Marker, "marker", "", "Marker")
+	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive secret name in the calling account")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -113,9 +115,8 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 	var body secrets.CreateSecretRequest
 	var bodyFile string
 	var descriptionFlag string
-	var kmsKeyIdFlag string
+	var kmsKeyFlag string
 	var recoveryWindowDaysFlag int
-	var recoveryWindowSecondsFlag int
 	var tagsFlag string
 	var valueFlag string
 	var idempotencyKey string
@@ -137,14 +138,11 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("kms-key-id") {
-				body.KMSKeyID = &kmsKeyIdFlag
+			if cmd.Flags().Changed("kms-key") {
+				body.KMSKey = &kmsKeyFlag
 			}
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
-			}
-			if cmd.Flags().Changed("recovery-window-seconds") {
-				body.RecoveryWindowSeconds = &recoveryWindowSecondsFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -169,11 +167,10 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&kmsKeyIdFlag, "kms-key-id", "", "Customer-managed KMS key to encrypt this secret under")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "UUID, CRN or account-scoped name of a customer-managed KMS key to encrypt this secret under")
 	f.StringVar(&body.Name, "name", "", "Unique within the calling account")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "Recovery window days")
-	f.IntVar(&recoveryWindowSecondsFlag, "recovery-window-seconds", 0, "Legacy alias: 86400–2592000 in multiples of 86400; zero keeps the legacy default")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&valueFlag, "value", "", "Base64 of the initial value bytes (1 byte - 64 KiB)")
 	_ = cmd.MarkFlagRequired("value")
@@ -229,7 +226,6 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 	var body secrets.DeleteSecretRequest
 	var bodyFile string
 	var recoveryWindowDaysFlag int
-	var recoveryWindowSecondsFlag int
 	cmd := &cobra.Command{
 		Use:   "delete <secret-id>",
 		Short: "Schedule deletion (soft delete with recovery window)",
@@ -247,9 +243,6 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
-			if cmd.Flags().Changed("recovery-window-seconds") {
-				body.RecoveryWindowSeconds = &recoveryWindowSecondsFlag
-			}
 			out, err := c.DeleteSecret(cmd.Context(), args[0], &body)
 			if err != nil {
 				return err
@@ -261,7 +254,6 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "Override the secret's stored window")
-	f.IntVar(&recoveryWindowSecondsFlag, "recovery-window-seconds", 0, "Legacy alias: 86400–2592000 in multiples of 86400; zero keeps the stored window")
 	return cmd
 }
 

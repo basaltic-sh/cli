@@ -104,7 +104,7 @@ func newTelemetryLogListCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&fromFlag, "from", "", "Lower bound on timestamp (inclusive) (RFC 3339)")
 	_ = cmd.MarkFlagRequired("from")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
-	f.StringVar(&params.LogGroup, "log-group", "", "Filter by parent log group name")
+	f.StringVar(&params.LogGroup, "log-group", "", "Filter by log-group UUID, CRN or exact name in the authenticated account")
 	f.StringVar(&params.LogStream, "log-stream", "", "Filter by stream name within the group")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.MinSeverity, "min-severity", "", "Filter to records with severity >= this band One of: \"TRACE\", \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\", \"FATAL\"")
@@ -220,9 +220,10 @@ func newTelemetryLogGroupListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact telemetry/log-group CRN filter in the authenticated account and serving region")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Exact-match name lookup (single-result shortcut)")
+	f.StringVar(&params.Name, "name", "", "Exact name filter, intersected with crn and pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -255,7 +256,7 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 	var body telemetry.CreateLogGroupRequest
 	var bodyFile string
 	var descriptionFlag string
-	var kmsKeyCrnFlag string
+	var kmsKeyFlag string
 	var retentionDaysFlag int
 	var tagsFlag string
 	var idempotencyKey string
@@ -277,8 +278,8 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("kms-key-crn") {
-				body.KMSKeyCRN = &kmsKeyCrnFlag
+			if cmd.Flags().Changed("kms-key") {
+				body.KMSKey = &kmsKeyFlag
 			}
 			if cmd.Flags().Changed("retention-days") {
 				body.RetentionDays = &retentionDaysFlag
@@ -303,8 +304,8 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&kmsKeyCrnFlag, "kms-key-crn", "", "Kms key crn")
-	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
+	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650, or omit for never expire")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
@@ -318,7 +319,7 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var clearRetentionFlag bool
 	var descriptionFlag string
-	var kmsKeyCrnFlag string
+	var kmsKeyFlag string
 	var retentionDaysFlag int
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -341,8 +342,8 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("kms-key-crn") {
-				body.KMSKeyCRN = &kmsKeyCrnFlag
+			if cmd.Flags().Changed("kms-key") {
+				body.KMSKey = &kmsKeyFlag
 			}
 			if cmd.Flags().Changed("retention-days") {
 				body.RetentionDays = &retentionDaysFlag
@@ -364,7 +365,7 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&clearRetentionFlag, "clear-retention", false, "When true, sets retention to never-expire (ignores retention_days)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&kmsKeyCrnFlag, "kms-key-crn", "", "Pass an empty string to disassociate")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650; pass clear_retention to switch to never expire")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -916,7 +917,7 @@ func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
 	var body telemetry.UpdateTraceSettingsRequest
 	var bodyFile string
 	var clearRetentionFlag bool
-	var kmsKeyCrnFlag string
+	var kmsKeyFlag string
 	var retentionDaysFlag int
 	cmd := &cobra.Command{
 		Use:   "set",
@@ -935,8 +936,8 @@ func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("clear-retention") {
 				body.ClearRetention = &clearRetentionFlag
 			}
-			if cmd.Flags().Changed("kms-key-crn") {
-				body.KMSKeyCRN = &kmsKeyCrnFlag
+			if cmd.Flags().Changed("kms-key") {
+				body.KMSKey = &kmsKeyFlag
 			}
 			if cmd.Flags().Changed("retention-days") {
 				body.RetentionDays = &retentionDaysFlag
@@ -952,7 +953,7 @@ func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&clearRetentionFlag, "clear-retention", false, "When true, sets retention to never-expire (ignores retention_days)")
-	f.StringVar(&kmsKeyCrnFlag, "kms-key-crn", "", "Pass an empty string to disassociate")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650; pass clear_retention=true to switch to never-expire")
 	return cmd
 }
