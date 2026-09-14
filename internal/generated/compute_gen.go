@@ -287,8 +287,6 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&currentFlag, "current", false, "Make this the current version for its (name, architecture) once active")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&eolDateFlag, "eol-date", "", "The day this release stops receiving free security updates")
-	f.StringVar(&body.Format, "format", "", "Source disk format at source_url; converted to the raw base on import (one of: qcow2, raw, vmdk, vhd, vhdx, vdi)")
-	_ = cmd.MarkFlagRequired("format")
 	f.IntVar(&minDiskGbFlag, "min-disk-gb", 0, "Min disk gb")
 	f.IntVar(&minRammbFlag, "min-ram-mb", 0, "Min ram mb")
 	f.StringVar(&body.Name, "name", "", "Immutable image name (e.g")
