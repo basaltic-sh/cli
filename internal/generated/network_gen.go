@@ -327,6 +327,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var descriptionFlag string
 	var familyFlag string
+	var healthCheckFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -350,6 +351,11 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("family") {
 				body.Family = (*network.IPFamily)(&familyFlag)
 			}
+			if healthCheckFlag != "" {
+				if err := json.Unmarshal([]byte(healthCheckFlag), &body.HealthCheck); err != nil {
+					return fmt.Errorf("--health-check: %w", err)
+				}
+			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -371,6 +377,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&familyFlag, "family", "", "Which family to allocate in (one of: ipv4, ipv6)")
+	f.StringVar(&healthCheckFlag, "health-check", "", "An optional readiness check for the address's members (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -381,6 +388,7 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 	var body network.FloatingIPUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
+	var healthCheckFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <floating-ip-id>",
@@ -399,6 +407,11 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
+			if healthCheckFlag != "" {
+				if err := json.Unmarshal([]byte(healthCheckFlag), &body.HealthCheck); err != nil {
+					return fmt.Errorf("--health-check: %w", err)
+				}
+			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -415,6 +428,7 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&healthCheckFlag, "health-check", "", "Set (an object) or clear (null) the address's readiness check (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }

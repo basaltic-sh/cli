@@ -645,7 +645,7 @@ func newDnsZoneListVpcAssociationsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&params.CRN, "crn", "", "Exact associated VPC CRN in the configured DNS region")
+	f.StringVar(&params.CRN, "crn", "", "Exact associated VPC CRN in a region enabled for DNS")
 	f.StringVar(&params.Name, "name", "", "Exact name of an associated VPC")
 	return cmd
 }
