@@ -288,6 +288,7 @@ func newNetworkFloatingIpListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface for an ordinary binding, an instance pool (including a pool with zero members), or a load balancer")
 	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
@@ -303,7 +304,7 @@ func newNetworkFloatingIpGetCommand(state *cli.State) *cobra.Command {
 		Use:   "get <ref>",
 		Short: "Get floating IP",
 		Args:  cobra.ExactArgs(1),
-		Long:  "Get floating IP.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
+		Long:  "Get floating IP.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --attached-to with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
@@ -318,6 +319,7 @@ func newNetworkFloatingIpGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface for an ordinary binding, an instance pool (including a pool with zero members), or a load balancer")
 	return cmd
 }
 

@@ -1309,7 +1309,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "Desired count")
-	f.IntVar(&maxCountFlag, "max-count", 0, "Max count")
+	f.IntVar(&maxCountFlag, "max-count", 0, "A value of 0 means the pool holds no members until max_count is raised")
 	f.IntVar(&minCountFlag, "min-count", 0, "Min count")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
@@ -1325,6 +1325,8 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstancePoolUpdateRequest
 	var bodyFile string
 	var desiredCountFlag int
+	var maxCountFlag int
+	var minCountFlag int
 	var tagsFlag string
 	var templateFlag string
 	cmd := &cobra.Command{
@@ -1343,6 +1345,12 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("desired-count") {
 				body.DesiredCount = &desiredCountFlag
+			}
+			if cmd.Flags().Changed("max-count") {
+				body.MaxCount = &maxCountFlag
+			}
+			if cmd.Flags().Changed("min-count") {
+				body.MinCount = &minCountFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1364,7 +1372,9 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the pool's min_count/max_count and the hard platform cap of 100")
+	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the resulting min_count/max_count and the hard platform cap of 100")
+	f.IntVar(&maxCountFlag, "max-count", 0, "New upper bound; omitted desired_count falls to this bound if needed")
+	f.IntVar(&minCountFlag, "min-count", 0, "New lower bound; omitted desired_count rises to this bound if needed")
 	f.StringVar(&tagsFlag, "tags", "", "REPLACES the pool's labels: the map you send becomes the whole set, an empty object clears them, and omitting the field leaves them alone (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Replaces the launch config WHOLESALE — the object you send is what the pool launches next, and anything you leave out is cleared rather than kept (JSON)")
 	return cmd
@@ -1459,14 +1469,19 @@ func newComputeInstancePoolDetachFloatingIpCommand(state *cli.State) *cobra.Comm
 // newComputeInstancePoolListFloatingIpsCommand builds `basaltic compute instance-pool list-floating-ips`.
 func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Command {
 	var params compute.ListInstancePoolFloatingIPsParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list-floating-ips <pool-id>",
 		Short: "List the pool's shared public addresses",
 		Args:  cobra.ExactArgs(1),
+		Long:  "List the pool's shared public addresses.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListInstancePoolFloatingIPsAll(cmd.Context(), args[0], &params))
 			}
 			page, err := c.ListInstancePoolFloatingIPs(cmd.Context(), args[0], &params)
 			if err != nil {
@@ -1477,22 +1492,30 @@ func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Comma
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
-	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newComputeInstancePoolListInstancesCommand builds `basaltic compute instance-pool list-instances`.
 func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command {
 	var params compute.ListPoolInstancesParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list-instances <pool-id>",
-		Short: "List a pool's instance bindings",
+		Short: "List a pool's instances",
 		Args:  cobra.ExactArgs(1),
+		Long:  "List a pool's instances.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListPoolInstancesAll(cmd.Context(), args[0], &params))
 			}
 			page, err := c.ListPoolInstances(cmd.Context(), args[0], &params)
 			if err != nil {
@@ -1504,7 +1527,13 @@ func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
+	f.StringVar((*string)(&params.CurrentState), "current-state", "", "Filter by where the instances actually are (one of: pending, building, running, stopping, stopped, rebooting, migrating, deleting, deleted, error, crashed, paused, suspended)")
+	f.StringVar(&params.Flavor, "flavor", "", "Filter by regional flavor reference (UUID, CRN or exact name)")
+	f.StringVar(&params.Image, "image", "", "Filter by image reference (UUID, CRN or name; images also accept name:version)")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
