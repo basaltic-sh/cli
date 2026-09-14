@@ -85,16 +85,18 @@ func newComputeFlavorListCommand(state *cli.State) *cobra.Command {
 
 // newComputeFlavorGetCommand builds `basaltic compute flavor get`.
 func newComputeFlavorGetCommand(state *cli.State) *cobra.Command {
+	var scope compute.ListFlavorsParams
 	cmd := &cobra.Command{
-		Use:   "get <flavor-id>",
+		Use:   "get <ref>",
 		Short: "Get flavor",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get flavor.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetFlavor(cmd.Context(), args[0])
+			out, err := c.GetFlavorByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -171,16 +173,18 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 
 // newComputeImageGetCommand builds `basaltic compute image get`.
 func newComputeImageGetCommand(state *cli.State) *cobra.Command {
+	var scope compute.ListImagesParams
 	cmd := &cobra.Command{
-		Use:   "get <image-id>",
+		Use:   "get <ref>",
 		Short: "Get an image",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get an image.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetImage(cmd.Context(), args[0])
+			out, err := c.GetImageByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -287,7 +291,7 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("format")
 	f.IntVar(&minDiskGbFlag, "min-disk-gb", 0, "Min disk gb")
 	f.IntVar(&minRammbFlag, "min-ram-mb", 0, "Min ram mb")
-	f.StringVar(&body.Name, "name", "", "Movable tag name (e.g")
+	f.StringVar(&body.Name, "name", "", "Immutable image name (e.g")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&osFlag, "os", "", "Os")
 	f.StringVar(&osVersionFlag, "os-version", "", "Os version")
@@ -446,7 +450,7 @@ func newComputeInstanceListCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
 	f.StringVar((*string)(&params.CurrentState), "current-state", "", "Filter by where the instances actually are (one of: pending, building, running, stopping, stopped, rebooting, migrating, deleting, deleted, error, crashed, paused, suspended)")
-	f.StringVar(&params.Flavor, "flavor", "", "Filter by flavor reference (UUID, CRN or name; images also accept name:version)")
+	f.StringVar(&params.Flavor, "flavor", "", "Filter by regional flavor reference (UUID, CRN or exact name)")
 	f.StringVar(&params.Image, "image", "", "Filter by image reference (UUID, CRN or name; images also accept name:version)")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
@@ -457,16 +461,18 @@ func newComputeInstanceListCommand(state *cli.State) *cobra.Command {
 
 // newComputeInstanceGetCommand builds `basaltic compute instance get`.
 func newComputeInstanceGetCommand(state *cli.State) *cobra.Command {
+	var scope compute.ListInstancesParams
 	cmd := &cobra.Command{
-		Use:   "get <instance-id>",
+		Use:   "get <ref>",
 		Short: "Get instance",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get instance.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --flavor or --image with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInstance(cmd.Context(), args[0])
+			out, err := c.GetInstanceByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -475,6 +481,8 @@ func newComputeInstanceGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Flavor, "flavor", "", "Filter by regional flavor reference (UUID, CRN or exact name)")
+	f.StringVar(&scope.Image, "image", "", "Filter by image reference (UUID, CRN or name; images also accept name:version)")
 	return cmd
 }
 
@@ -556,7 +564,7 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&architectureFlag, "architecture", "", "Architecture for bare image names; a CRN pins its architecture")
+	f.StringVar(&architectureFlag, "architecture", "", "Architecture for image names and name:version tags (default amd64); a CRN pins its own architecture and version")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name)")
 	_ = cmd.MarkFlagRequired("flavor")
@@ -581,7 +589,6 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var descriptionFlag string
 	var metadataFlag string
-	var nameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <instance-id>",
@@ -605,9 +612,6 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--metadata: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -625,7 +629,6 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
-	f.StringVar(&nameFlag, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -1221,16 +1224,18 @@ func newComputeInstancePoolListCommand(state *cli.State) *cobra.Command {
 
 // newComputeInstancePoolGetCommand builds `basaltic compute instance-pool get`.
 func newComputeInstancePoolGetCommand(state *cli.State) *cobra.Command {
+	var scope compute.ListInstancePoolsParams
 	cmd := &cobra.Command{
-		Use:   "get <pool-id>",
+		Use:   "get <ref>",
 		Short: "Get an instance pool",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get an instance pool.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInstancePool(cmd.Context(), args[0])
+			out, err := c.GetInstancePoolByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1578,16 +1583,18 @@ func newComputeKeypairListCommand(state *cli.State) *cobra.Command {
 
 // newComputeKeypairGetCommand builds `basaltic compute keypair get`.
 func newComputeKeypairGetCommand(state *cli.State) *cobra.Command {
+	var scope compute.ListKeypairsParams
 	cmd := &cobra.Command{
-		Use:   "get <keypair-id>",
+		Use:   "get <ref>",
 		Short: "Get keypair",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get keypair.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetKeypair(cmd.Context(), args[0])
+			out, err := c.GetKeypairByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}

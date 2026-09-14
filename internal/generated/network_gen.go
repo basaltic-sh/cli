@@ -102,16 +102,18 @@ func newNetworkEgressOnlyGatewayListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkEgressOnlyGatewayGetCommand builds `basaltic network egress-only-gateway get`.
 func newNetworkEgressOnlyGatewayGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListEgressOnlyGatewaysParams
 	cmd := &cobra.Command{
-		Use:   "get <egress-only-gateway-id>",
+		Use:   "get <ref>",
 		Short: "Get egress-only gateway",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get egress-only gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetEgressOnlyGateway(cmd.Context(), args[0])
+			out, err := c.GetEgressOnlyGatewayByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -296,16 +298,18 @@ func newNetworkFloatingIpListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkFloatingIpGetCommand builds `basaltic network floating-ip get`.
 func newNetworkFloatingIpGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListFloatingIPsParams
 	cmd := &cobra.Command{
-		Use:   "get <floating-ip-id>",
+		Use:   "get <ref>",
 		Short: "Get floating IP",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get floating IP.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetFloatingIP(cmd.Context(), args[0])
+			out, err := c.GetFloatingIPByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -576,16 +580,18 @@ func newNetworkInterfaceListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkInterfaceGetCommand builds `basaltic network interface get`.
 func newNetworkInterfaceGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListInterfacesParams
 	cmd := &cobra.Command{
-		Use:   "get <interface-id>",
+		Use:   "get <ref>",
 		Short: "Get interface",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get interface.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --subnet or --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInterface(cmd.Context(), args[0])
+			out, err := c.GetInterfaceByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -594,6 +600,8 @@ func newNetworkInterfaceGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Subnet, "subnet", "", "Subnet UUID or nested CRN; an exact bare name requires the vpc filter")
+	f.StringVar(&scope.VPC, "vpc", "", "VPC UUID, CRN or exact account-scoped name")
 	return cmd
 }
 
@@ -839,16 +847,18 @@ func newNetworkInternetGatewayListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkInternetGatewayGetCommand builds `basaltic network internet-gateway get`.
 func newNetworkInternetGatewayGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListInternetGatewaysParams
 	cmd := &cobra.Command{
-		Use:   "get <internet-gateway-id>",
+		Use:   "get <ref>",
 		Short: "Get internet gateway",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get internet gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInternetGateway(cmd.Context(), args[0])
+			out, err := c.GetInternetGatewayByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1101,16 +1111,18 @@ func newNetworkNatGatewayListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkNatGatewayGetCommand builds `basaltic network nat-gateway get`.
 func newNetworkNatGatewayGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListNATGatewaysParams
 	cmd := &cobra.Command{
-		Use:   "get <nat-gateway-id>",
+		Use:   "get <ref>",
 		Short: "Get NAT gateway",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get NAT gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --subnet or --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetNATGateway(cmd.Context(), args[0])
+			out, err := c.GetNATGatewayByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1119,6 +1131,8 @@ func newNetworkNatGatewayGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Subnet, "subnet", "", "Subnet UUID or nested CRN; an exact bare name requires the vpc filter")
+	f.StringVar(&scope.VPC, "vpc", "", "VPC UUID, CRN or exact account-scoped name")
 	return cmd
 }
 
@@ -1293,16 +1307,18 @@ func newNetworkRouteListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkRouteGetCommand builds `basaltic network route get`.
 func newNetworkRouteGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListRoutesParams
 	cmd := &cobra.Command{
-		Use:   "get <route-table-id> <route-id>",
+		Use:   "get <route-table-id> <ref>",
 		Short: "Get route",
 		Args:  cobra.ExactArgs(2),
+		Long:  "Get route.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetRoute(cmd.Context(), args[0], args[1])
+			out, err := c.GetRouteByReference(cmd.Context(), args[0], args[1], &scope)
 			if err != nil {
 				return err
 			}
@@ -1504,16 +1520,18 @@ func newNetworkRouteTableListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkRouteTableGetCommand builds `basaltic network route-table get`.
 func newNetworkRouteTableGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListRouteTablesParams
 	cmd := &cobra.Command{
-		Use:   "get <route-table-id>",
+		Use:   "get <ref>",
 		Short: "Get route table",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get route table.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetRouteTable(cmd.Context(), args[0])
+			out, err := c.GetRouteTableByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1522,6 +1540,7 @@ func newNetworkRouteTableGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
 	return cmd
 }
 
@@ -1696,16 +1715,18 @@ func newNetworkSecurityGroupListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkSecurityGroupGetCommand builds `basaltic network security-group get`.
 func newNetworkSecurityGroupGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListSecurityGroupsParams
 	cmd := &cobra.Command{
-		Use:   "get <security-group-id>",
+		Use:   "get <ref>",
 		Short: "Get security group",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get security group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSecurityGroup(cmd.Context(), args[0])
+			out, err := c.GetSecurityGroupByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1885,16 +1906,18 @@ func newNetworkSecurityGroupRuleListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkSecurityGroupRuleGetCommand builds `basaltic network security-group-rule get`.
 func newNetworkSecurityGroupRuleGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListSecurityGroupRulesParams
 	cmd := &cobra.Command{
-		Use:   "get <security-group-id> <rule-id>",
+		Use:   "get <security-group-id> <ref>",
 		Short: "Get security group rule",
 		Args:  cobra.ExactArgs(2),
+		Long:  "Get security group rule.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSecurityGroupRule(cmd.Context(), args[0], args[1])
+			out, err := c.GetSecurityGroupRuleByReference(cmd.Context(), args[0], args[1], &scope)
 			if err != nil {
 				return err
 			}
@@ -2053,16 +2076,18 @@ func newNetworkSubnetListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkSubnetGetCommand builds `basaltic network subnet get`.
 func newNetworkSubnetGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListSubnetsParams
 	cmd := &cobra.Command{
-		Use:   "get <subnet-id>",
+		Use:   "get <ref>",
 		Short: "Get subnet",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get subnet.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSubnet(cmd.Context(), args[0])
+			out, err := c.GetSubnetByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -2071,6 +2096,7 @@ func newNetworkSubnetGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
 	return cmd
 }
 
@@ -2272,16 +2298,18 @@ func newNetworkVpcListCommand(state *cli.State) *cobra.Command {
 
 // newNetworkVpcGetCommand builds `basaltic network vpc get`.
 func newNetworkVpcGetCommand(state *cli.State) *cobra.Command {
+	var scope network.ListVPCsParams
 	cmd := &cobra.Command{
-		Use:   "get <vpc-id>",
+		Use:   "get <ref>",
 		Short: "Get VPC",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get VPC.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetVPC(cmd.Context(), args[0])
+			out, err := c.GetVPCByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}

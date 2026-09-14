@@ -70,6 +70,21 @@ basaltic iam user list
 Positional arguments are the resource's identifiers, in the order the API's
 path takes them. Everything else is a flag.
 
+`get` takes a reference rather than only an id: the resource's id, its CRN
+or its name, read by syntax the way the platform reads it (a `crn:` value is
+a CRN, the 36-character UUID form is an id, anything else is a name; a miss
+under one reading is never retried under another).
+
+```bash
+basaltic compute instance get web-01
+basaltic compute instance get crn:compute:sa-saopaulo-1:acme:instance/web-01
+basaltic network subnet get public --vpc prod   # a name is unique within its parent
+```
+
+A resource whose name is unique only within a parent (a subnet within a VPC,
+a snapshot within a volume) takes the parent as a flag; without it a bare name
+that matches more than one is refused rather than guessed.
+
 Longer service names have short aliases, and every resource accepts its
 plural:
 

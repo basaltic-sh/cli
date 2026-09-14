@@ -109,8 +109,10 @@ func newStorageBucketListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN filter")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last bucket name from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact account-scoped bucket name; an empty value matches nothing")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1272,27 +1274,31 @@ func newStorageSnapshotListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN filter")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last snapshot id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Case-insensitive substring match on the snapshot name")
+	f.StringVar(&params.Name, "name", "", "Exact snapshot name within an explicitly supplied volume filter; missing volume returns 400")
+	f.StringVar(&params.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID, CRN, or exact name")
 	f.StringVar((*string)(&params.Status), "status", "", "Status (one of: creating, available, deleting, error)")
-	f.StringVar(&params.VolumeID, "volume-id", "", "Narrow the listing to snapshots of one volume")
+	f.StringVar(&params.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newStorageSnapshotGetCommand builds `basaltic storage snapshot get`.
 func newStorageSnapshotGetCommand(state *cli.State) *cobra.Command {
+	var scope storage.ListSnapshotsParams
 	cmd := &cobra.Command{
-		Use:   "get <snapshot-id>",
+		Use:   "get <ref>",
 		Short: "Get snapshot",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get snapshot.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --snapshot-policy or --volume with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSnapshot(cmd.Context(), args[0])
+			out, err := c.GetSnapshotByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1301,6 +1307,8 @@ func newStorageSnapshotGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID, CRN, or exact name")
+	f.StringVar(&scope.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	return cmd
 }
 
@@ -1352,8 +1360,8 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.VolumeID, "volume-id", "", "Volume id")
-	_ = cmd.MarkFlagRequired("volume-id")
+	f.StringVar(&body.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
+	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1469,27 +1477,30 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN filter")
 	f.BoolVar(&enabledFlag, "enabled", false, "Narrow to enabled (or paused) policies")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last policy id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Case-insensitive substring match on the policy name")
-	f.StringVar(&params.VolumeID, "volume-id", "", "Narrow the listing to the policy attached to one volume")
+	f.StringVar(&params.Name, "name", "", "Exact account-scoped name match; an empty value matches nothing")
+	f.StringVar(&params.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newStorageSnapshotPolicyGetCommand builds `basaltic storage snapshot-policy get`.
 func newStorageSnapshotPolicyGetCommand(state *cli.State) *cobra.Command {
+	var scope storage.ListSnapshotPoliciesParams
 	cmd := &cobra.Command{
-		Use:   "get <policy-id>",
+		Use:   "get <ref>",
 		Short: "Get snapshot policy",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get snapshot policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --volume with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSnapshotPolicy(cmd.Context(), args[0])
+			out, err := c.GetSnapshotPolicyByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1498,6 +1509,7 @@ func newStorageSnapshotPolicyGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	return cmd
 }
 
@@ -1563,8 +1575,8 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("retention-count")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Retention days")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.VolumeID, "volume-id", "", "Volume id")
-	_ = cmd.MarkFlagRequired("volume-id")
+	f.StringVar(&body.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
+	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1697,9 +1709,10 @@ func newStorageVolumeListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN filter")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last volume id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Case-insensitive substring match on the volume name")
+	f.StringVar(&params.Name, "name", "", "Exact account-scoped name match; an empty value matches nothing")
 	f.StringVar((*string)(&params.Status), "status", "", "Status (one of: creating, available, in_use, extending, deleting, error)")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
@@ -1707,16 +1720,18 @@ func newStorageVolumeListCommand(state *cli.State) *cobra.Command {
 
 // newStorageVolumeGetCommand builds `basaltic storage volume get`.
 func newStorageVolumeGetCommand(state *cli.State) *cobra.Command {
+	var scope storage.ListVolumesParams
 	cmd := &cobra.Command{
-		Use:   "get <volume-id>",
+		Use:   "get <ref>",
 		Short: "Get volume",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get volume.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetVolume(cmd.Context(), args[0])
+			out, err := c.GetVolumeByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1732,10 +1747,11 @@ func newStorageVolumeGetCommand(state *cli.State) *cobra.Command {
 func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 	var body storage.VolumeCreateRequest
 	var bodyFile string
+	var architectureFlag string
 	var bootableFlag bool
 	var descriptionFlag string
-	var sourceImageIdFlag string
-	var sourceSnapshotIdFlag string
+	var sourceImageFlag string
+	var sourceSnapshotFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -1753,17 +1769,20 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
+			if cmd.Flags().Changed("architecture") {
+				body.Architecture = &architectureFlag
+			}
 			if cmd.Flags().Changed("bootable") {
 				body.Bootable = &bootableFlag
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("source-image-id") {
-				body.SourceImageID = &sourceImageIdFlag
+			if cmd.Flags().Changed("source-image") {
+				body.SourceImage = &sourceImageFlag
 			}
-			if cmd.Flags().Changed("source-snapshot-id") {
-				body.SourceSnapshotID = &sourceSnapshotIdFlag
+			if cmd.Flags().Changed("source-snapshot") {
+				body.SourceSnapshot = &sourceSnapshotFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1784,14 +1803,15 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&architectureFlag, "architecture", "", "Architecture used for source_image name resolution")
 	f.BoolVar(&bootableFlag, "bootable", false, "Bootable")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&body.SizeGB, "size-gb", 0, "Size gb")
 	_ = cmd.MarkFlagRequired("size-gb")
-	f.StringVar(&sourceImageIdFlag, "source-image-id", "", "Reserved: when supplied, the volume will be provisioned as a clone of the referenced image's base snapshot")
-	f.StringVar(&sourceSnapshotIdFlag, "source-snapshot-id", "", "Clone the new volume from an existing snapshot (restore)")
+	f.StringVar(&sourceImageFlag, "source-image", "", "Image UUID, name, name:version, or full CRN image/<name>/architecture/<arch>/version/<version>")
+	f.StringVar(&sourceSnapshotFlag, "source-snapshot", "", "Clone from an available account-owned snapshot UUID or nested CRN volume/<volume-name>/snapshot/<snapshot-name>")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar((*string)(&body.VolumeType), "volume-type", "", "Volume type (one of: ssd, nvme)")
 	_ = cmd.MarkFlagRequired("volume-type")
@@ -1918,6 +1938,7 @@ func newStorageVolumeTypeCommand(state *cli.State) *cobra.Command {
 
 // newStorageVolumeTypeListCommand builds `basaltic storage volume-type list`.
 func newStorageVolumeTypeListCommand(state *cli.State) *cobra.Command {
+	var params storage.ListVolumeTypesParams
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List volume types",
@@ -1927,7 +1948,7 @@ func newStorageVolumeTypeListCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListVolumeTypes(cmd.Context())
+			page, err := c.ListVolumeTypes(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
@@ -1936,5 +1957,7 @@ func newStorageVolumeTypeListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact regional platform volume-type CRN")
+	f.StringVar(&params.Name, "name", "", "Exact display name, case-sensitive; an empty value matches nothing")
 	return cmd
 }

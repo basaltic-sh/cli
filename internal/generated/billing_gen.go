@@ -79,6 +79,7 @@ func newBillingCreditListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact organization-scoped credit CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
@@ -124,6 +125,7 @@ func newBillingInvoiceListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact organization-scoped invoice CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
@@ -132,16 +134,18 @@ func newBillingInvoiceListCommand(state *cli.State) *cobra.Command {
 
 // newBillingInvoiceGetCommand builds `basaltic billing invoice get`.
 func newBillingInvoiceGetCommand(state *cli.State) *cobra.Command {
+	var scope billing.ListInvoicesParams
 	cmd := &cobra.Command{
-		Use:   "get <invoice-id>",
+		Use:   "get <ref>",
 		Short: "Get an invoice with its line items",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get an invoice with its line items.\n\n<ref> is its id or its CRN. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nThis resource has no name.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := billingClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInvoice(cmd.Context(), args[0])
+			out, err := c.GetInvoiceByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -213,6 +217,7 @@ func newBillingPaymentListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact organization-scoped payment CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
@@ -304,6 +309,7 @@ func newBillingTransactionListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact organization-scoped transaction CRN")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")

@@ -82,16 +82,18 @@ func newCertificateCertificateListCommand(state *cli.State) *cobra.Command {
 
 // newCertificateCertificateGetCommand builds `basaltic certificate certificate get`.
 func newCertificateCertificateGetCommand(state *cli.State) *cobra.Command {
+	var scope certificate.ListCertificatesParams
 	cmd := &cobra.Command{
-		Use:   "get <certificate-id>",
+		Use:   "get <ref>",
 		Short: "Get certificate",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get certificate.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := certificateClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetCertificate(cmd.Context(), args[0])
+			out, err := c.GetCertificateByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}

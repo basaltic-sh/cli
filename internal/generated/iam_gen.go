@@ -92,24 +92,28 @@ func newIamAccountListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamAccountGetCommand builds `basaltic iam account get`.
 func newIamAccountGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListAccountsParams
 	cmd := &cobra.Command{
-		Use:   "get <account-id>",
+		Use:   "get <ref>",
 		Short: "Get account",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get account.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetAccount(cmd.Context(), args[0])
+			out, err := c.GetAccountByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -305,25 +309,28 @@ func newIamGroupListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamGroupGetCommand builds `basaltic iam group get`.
 func newIamGroupGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListGroupsParams
 	cmd := &cobra.Command{
-		Use:   "get <group-id>",
+		Use:   "get <ref>",
 		Short: "Get group",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetGroup(cmd.Context(), args[0])
+			out, err := c.GetGroupByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -385,7 +392,6 @@ func newIamGroupUpdateCommand(state *cli.State) *cobra.Command {
 	var body iam.GroupUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
-	var nameFlag string
 	cmd := &cobra.Command{
 		Use:   "update <group-id>",
 		Short: "Update group",
@@ -403,9 +409,6 @@ func newIamGroupUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			out, err := c.UpdateGroup(cmd.Context(), args[0], &body)
 			if err != nil {
 				return err
@@ -417,7 +420,6 @@ func newIamGroupUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&nameFlag, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	return cmd
 }
 
@@ -478,8 +480,8 @@ func newIamGroupAttachPolicyCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -555,6 +557,7 @@ func newIamGroupGetInlinePolicyCommand(state *cli.State) *cobra.Command {
 
 // newIamGroupListInlinePoliciesCommand builds `basaltic iam group list-inline-policies`.
 func newIamGroupListInlinePoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListGroupInlinePoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-inline-policies <group-id>",
 		Short: "List a group's inline policies",
@@ -564,7 +567,7 @@ func newIamGroupListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListGroupInlinePolicies(cmd.Context(), args[0])
+			page, err := c.ListGroupInlinePolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -573,11 +576,14 @@ func newIamGroupListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamGroupListPoliciesCommand builds `basaltic iam group list-policies`.
 func newIamGroupListPoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListGroupPoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-policies <group-id>",
 		Short: "List group policies",
@@ -587,7 +593,7 @@ func newIamGroupListPoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListGroupPolicies(cmd.Context(), args[0])
+			page, err := c.ListGroupPolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -596,6 +602,8 @@ func newIamGroupListPoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -625,8 +633,10 @@ func newIamGroupListServiceAccountsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -657,8 +667,10 @@ func newIamGroupListUsersCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -741,24 +753,28 @@ func newIamInvitationListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamInvitationGetCommand builds `basaltic iam invitation get`.
 func newIamInvitationGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListInvitationsParams
 	cmd := &cobra.Command{
-		Use:   "get <invitation-id>",
+		Use:   "get <ref>",
 		Short: "Get invitation",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get invitation.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetInvitation(cmd.Context(), args[0])
+			out, err := c.GetInvitationByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -842,8 +858,8 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("code-challenge")
 	f.StringVar(&body.CodeChallengeMethod, "code-challenge-method", "", "S256 only (one of: S256)")
 	_ = cmd.MarkFlagRequired("code-challenge-method")
-	f.StringVar(&body.OrganizationID, "organization-id", "", "Which organization the resulting session is scoped to")
-	_ = cmd.MarkFlagRequired("organization-id")
+	f.StringVar((*string)(&body.Organization), "organization", "", "Organization")
+	_ = cmd.MarkFlagRequired("organization")
 	f.StringVar(&body.RedirectURI, "redirect-uri", "", "For the CLI this must be urn:ietf:wg:oauth:2.0:oob — the out-of-band pseudo-redirect, meaning the code is DISPLAYED rather than delivered anywhere")
 	_ = cmd.MarkFlagRequired("redirect-uri")
 	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
@@ -890,8 +906,10 @@ func newIamOrganizationListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1030,25 +1048,28 @@ func newIamPolicyListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamPolicyGetCommand builds `basaltic iam policy get`.
 func newIamPolicyGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListPoliciesParams
 	cmd := &cobra.Command{
-		Use:   "get <policy-id>",
+		Use:   "get <ref>",
 		Short: "Get policy",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetPolicy(cmd.Context(), args[0])
+			out, err := c.GetPolicyByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1126,7 +1147,6 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var descriptionFlag string
 	var documentFlag string
-	var nameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <policy-id>",
@@ -1150,9 +1170,6 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
-			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -1170,7 +1187,6 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	f.StringVar(&nameFlag, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -1224,8 +1240,10 @@ func newIamPolicyListGroupsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1256,8 +1274,10 @@ func newIamPolicyListRolesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1288,8 +1308,10 @@ func newIamPolicyListServiceAccountsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1320,8 +1342,10 @@ func newIamPolicyListUsersCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1339,6 +1363,7 @@ func newIamRegionCommand(state *cli.State) *cobra.Command {
 
 // newIamRegionListCommand builds `basaltic iam region list`.
 func newIamRegionListCommand(state *cli.State) *cobra.Command {
+	var params iam.ListRegionsParams
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List regions",
@@ -1348,7 +1373,7 @@ func newIamRegionListCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.ListRegions(cmd.Context())
+			out, err := c.ListRegions(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
@@ -1357,6 +1382,8 @@ func newIamRegionListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -1413,25 +1440,28 @@ func newIamRoleListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamRoleGetCommand builds `basaltic iam role get`.
 func newIamRoleGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListRolesParams
 	cmd := &cobra.Command{
-		Use:   "get <role-id>",
+		Use:   "get <ref>",
 		Short: "Get role",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get role.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetRole(cmd.Context(), args[0])
+			out, err := c.GetRoleByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -1507,7 +1537,6 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 	var body iam.RoleUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
-	var nameFlag string
 	var tagsFlag string
 	var trustPolicyFlag string
 	cmd := &cobra.Command{
@@ -1526,9 +1555,6 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
-			}
-			if cmd.Flags().Changed("name") {
-				body.Name = &nameFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1551,7 +1577,6 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&nameFlag, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&trustPolicyFlag, "trust-policy", "", "Trust policy (JSON)")
 	return cmd
@@ -1620,8 +1645,8 @@ func newIamRoleAssumeCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Credential validity duration (15 min to 12 hours)")
 	f.StringVar(&policyFlag, "policy", "", "Policy (JSON)")
-	f.StringVar(&body.RoleID, "role-id", "", "Role id")
-	_ = cmd.MarkFlagRequired("role-id")
+	f.StringVar((*string)(&body.Role), "role", "", "Role")
+	_ = cmd.MarkFlagRequired("role")
 	return cmd
 }
 
@@ -1661,11 +1686,11 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.AccountID, "target-account-id", "", "The account the resulting credentials act in — the ownership scope stamped on the session, the same scope a signed request selects with X-Account-Id")
-	_ = cmd.MarkFlagRequired("target-account-id")
+	f.StringVar((*string)(&body.Account), "account", "", "Account")
+	_ = cmd.MarkFlagRequired("account")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Credential validity duration (15 min to 12 hours)")
-	f.StringVar(&body.RoleID, "role-id", "", "The role to assume")
-	_ = cmd.MarkFlagRequired("role-id")
+	f.StringVar((*string)(&body.Role), "role", "", "Role")
+	_ = cmd.MarkFlagRequired("role")
 	f.StringVar(&sessionNameFlag, "session-name", "", "A label recorded on the session and in the audit trail")
 	f.StringVar(&body.WebIdentityToken, "web-identity-token", "", "The identity token to exchange, as a signed JWT")
 	_ = cmd.MarkFlagRequired("web-identity-token")
@@ -1706,8 +1731,8 @@ func newIamRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1806,6 +1831,7 @@ func newIamRoleGetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 
 // newIamRoleListInlinePoliciesCommand builds `basaltic iam role list-inline-policies`.
 func newIamRoleListInlinePoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListRoleInlinePoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-inline-policies <role-id>",
 		Short: "List a role's inline policies",
@@ -1815,7 +1841,7 @@ func newIamRoleListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListRoleInlinePolicies(cmd.Context(), args[0])
+			page, err := c.ListRoleInlinePolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1824,11 +1850,14 @@ func newIamRoleListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamRoleListPoliciesCommand builds `basaltic iam role list-policies`.
 func newIamRoleListPoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListRolePoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-policies <role-id>",
 		Short: "List role policies",
@@ -1838,7 +1867,7 @@ func newIamRoleListPoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListRolePolicies(cmd.Context(), args[0])
+			page, err := c.ListRolePolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1847,6 +1876,8 @@ func newIamRoleListPoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -1940,8 +1971,8 @@ func newIamRoleSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }
 
@@ -2002,25 +2033,28 @@ func newIamServiceAccountListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamServiceAccountGetCommand builds `basaltic iam service-account get`.
 func newIamServiceAccountGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListServiceAccountsParams
 	cmd := &cobra.Command{
-		Use:   "get <service-account-id>",
+		Use:   "get <ref>",
 		Short: "Get service account",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get service account.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetServiceAccount(cmd.Context(), args[0])
+			out, err := c.GetServiceAccountByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -2189,8 +2223,8 @@ func newIamServiceAccountAddGroupCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.GroupID, "group-id", "", "Group id")
-	_ = cmd.MarkFlagRequired("group-id")
+	f.StringVar((*string)(&body.Group), "group", "", "Group")
+	_ = cmd.MarkFlagRequired("group")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2229,8 +2263,8 @@ func newIamServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2394,6 +2428,7 @@ func newIamServiceAccountGetPermissionBoundaryCommand(state *cli.State) *cobra.C
 
 // newIamServiceAccountListCredentialsCommand builds `basaltic iam service-account list-credentials`.
 func newIamServiceAccountListCredentialsCommand(state *cli.State) *cobra.Command {
+	var params iam.ListServiceAccountCredentialsParams
 	cmd := &cobra.Command{
 		Use:   "list-credentials <service-account-id>",
 		Short: "List credentials",
@@ -2403,7 +2438,7 @@ func newIamServiceAccountListCredentialsCommand(state *cli.State) *cobra.Command
 			if err != nil {
 				return err
 			}
-			page, err := c.ListServiceAccountCredentials(cmd.Context(), args[0])
+			page, err := c.ListServiceAccountCredentials(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -2412,11 +2447,14 @@ func newIamServiceAccountListCredentialsCommand(state *cli.State) *cobra.Command
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamServiceAccountListGroupsCommand builds `basaltic iam service-account list-groups`.
 func newIamServiceAccountListGroupsCommand(state *cli.State) *cobra.Command {
+	var params iam.ListServiceAccountGroupsParams
 	cmd := &cobra.Command{
 		Use:   "list-groups <service-account-id>",
 		Short: "List service account groups",
@@ -2426,7 +2464,7 @@ func newIamServiceAccountListGroupsCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListServiceAccountGroups(cmd.Context(), args[0])
+			page, err := c.ListServiceAccountGroups(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -2435,11 +2473,14 @@ func newIamServiceAccountListGroupsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamServiceAccountListInlinePoliciesCommand builds `basaltic iam service-account list-inline-policies`.
 func newIamServiceAccountListInlinePoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListServiceAccountInlinePoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-inline-policies <service-account-id>",
 		Short: "List a service account's inline policies",
@@ -2449,7 +2490,7 @@ func newIamServiceAccountListInlinePoliciesCommand(state *cli.State) *cobra.Comm
 			if err != nil {
 				return err
 			}
-			page, err := c.ListServiceAccountInlinePolicies(cmd.Context(), args[0])
+			page, err := c.ListServiceAccountInlinePolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -2458,11 +2499,14 @@ func newIamServiceAccountListInlinePoliciesCommand(state *cli.State) *cobra.Comm
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamServiceAccountListPoliciesCommand builds `basaltic iam service-account list-policies`.
 func newIamServiceAccountListPoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListServiceAccountPoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-policies <service-account-id>",
 		Short: "List service account policies",
@@ -2472,7 +2516,7 @@ func newIamServiceAccountListPoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListServiceAccountPolicies(cmd.Context(), args[0])
+			page, err := c.ListServiceAccountPolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -2481,6 +2525,8 @@ func newIamServiceAccountListPoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -2597,8 +2643,8 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }
 
@@ -2646,27 +2692,31 @@ func newIamStsSessionListCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.BoolVar(&activeOnlyFlag, "active-only", false, "Only show active (non-expired, non-revoked) sessions")
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.PrincipalID, "principal-id", "", "Filter by principal ID (user or service account)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
+	f.StringVar(&params.Principal, "principal", "", "Principal reference; principal_type is required")
 	f.StringVar(&params.PrincipalType, "principal-type", "", "Filter by principal type")
-	f.StringVar(&params.RoleID, "role-id", "", "Filter by role ID")
+	f.StringVar(&params.Role, "role", "", "Role UUID, immutable name, or organization-scoped role CRN")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamStsSessionGetCommand builds `basaltic iam sts-session get`.
 func newIamStsSessionGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListSTSSessionsParams
 	cmd := &cobra.Command{
-		Use:   "get <session-id>",
+		Use:   "get <ref>",
 		Short: "Get STS session",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get STS session.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --principal or --role with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSTSSession(cmd.Context(), args[0])
+			out, err := c.GetSTSSessionByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -2675,6 +2725,8 @@ func newIamStsSessionGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Principal, "principal", "", "Principal reference; principal_type is required")
+	f.StringVar(&scope.Role, "role", "", "Role UUID, immutable name, or organization-scoped role CRN")
 	return cmd
 }
 
@@ -2885,25 +2937,28 @@ func newIamUserListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Filter by name (exact match or prefix with *)")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newIamUserGetCommand builds `basaltic iam user get`.
 func newIamUserGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListUsersParams
 	cmd := &cobra.Command{
-		Use:   "get <user-id>",
+		Use:   "get <ref>",
 		Short: "Get user",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get user.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetUser(cmd.Context(), args[0])
+			out, err := c.GetUserByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -2919,6 +2974,7 @@ func newIamUserGetCommand(state *cli.State) *cobra.Command {
 func newIamUserAddCommand(state *cli.State) *cobra.Command {
 	var body iam.UserAddRequest
 	var bodyFile string
+	var groupsFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -2934,6 +2990,11 @@ func newIamUserAddCommand(state *cli.State) *cobra.Command {
 			if bodyFile != "" {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
+				}
+			}
+			if groupsFlag != "" {
+				if err := json.Unmarshal([]byte(groupsFlag), &body.Groups); err != nil {
+					return fmt.Errorf("--groups: %w", err)
 				}
 			}
 			if tagsFlag != "" {
@@ -2957,7 +3018,7 @@ func newIamUserAddCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Email, "email", "", "Email of the user to add")
 	_ = cmd.MarkFlagRequired("email")
-	f.StringSliceVar(&body.GroupIDs, "group-ids", nil, "IDs of groups to add the user to")
+	f.StringVar(&groupsFlag, "groups", "", "Groups to assign when the invitation is accepted (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -2997,8 +3058,8 @@ func newIamUserAddGroupCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.GroupID, "group-id", "", "Group id")
-	_ = cmd.MarkFlagRequired("group-id")
+	f.StringVar((*string)(&body.Group), "group", "", "Group")
+	_ = cmd.MarkFlagRequired("group")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -3037,8 +3098,8 @@ func newIamUserAttachPolicyCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -3137,6 +3198,7 @@ func newIamUserGetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 
 // newIamUserListGroupsCommand builds `basaltic iam user list-groups`.
 func newIamUserListGroupsCommand(state *cli.State) *cobra.Command {
+	var params iam.ListUserGroupsParams
 	cmd := &cobra.Command{
 		Use:   "list-groups <user-id>",
 		Short: "List user groups",
@@ -3146,7 +3208,7 @@ func newIamUserListGroupsCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListUserGroups(cmd.Context(), args[0])
+			page, err := c.ListUserGroups(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -3155,11 +3217,14 @@ func newIamUserListGroupsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamUserListInlinePoliciesCommand builds `basaltic iam user list-inline-policies`.
 func newIamUserListInlinePoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListUserInlinePoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-inline-policies <user-id>",
 		Short: "List a user's inline policies",
@@ -3169,7 +3234,7 @@ func newIamUserListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListUserInlinePolicies(cmd.Context(), args[0])
+			page, err := c.ListUserInlinePolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -3178,11 +3243,14 @@ func newIamUserListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
 // newIamUserListPoliciesCommand builds `basaltic iam user list-policies`.
 func newIamUserListPoliciesCommand(state *cli.State) *cobra.Command {
+	var params iam.ListUserPoliciesParams
 	cmd := &cobra.Command{
 		Use:   "list-policies <user-id>",
 		Short: "List user policies",
@@ -3192,7 +3260,7 @@ func newIamUserListPoliciesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListUserPolicies(cmd.Context(), args[0])
+			page, err := c.ListUserPolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -3201,6 +3269,8 @@ func newIamUserListPoliciesCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -3340,7 +3410,7 @@ func newIamUserSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PolicyID, "policy-id", "", "Policy id")
-	_ = cmd.MarkFlagRequired("policy-id")
+	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
+	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }

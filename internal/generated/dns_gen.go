@@ -85,6 +85,7 @@ func newDnsRecordListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact nested record CRN")
 	f.BoolVar(&includeManagedFlag, "include-managed", false, "Include the platform-stamped rows (SOA, apex NS, and the DNSSEC set) alongside your own")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last record id from the previous page")
@@ -96,16 +97,18 @@ func newDnsRecordListCommand(state *cli.State) *cobra.Command {
 
 // newDnsRecordGetCommand builds `basaltic dns record get`.
 func newDnsRecordGetCommand(state *cli.State) *cobra.Command {
+	var scope dns.ListRecordsParams
 	cmd := &cobra.Command{
-		Use:   "get <zone-id> <record-id>",
+		Use:   "get <zone-id> <ref>",
 		Short: "Get record",
 		Args:  cobra.ExactArgs(2),
+		Long:  "Get record.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetRecord(cmd.Context(), args[0], args[1])
+			out, err := c.GetRecordByReference(cmd.Context(), args[0], args[1], &scope)
 			if err != nil {
 				return err
 			}
@@ -297,16 +300,18 @@ func newDnsZoneListCommand(state *cli.State) *cobra.Command {
 
 // newDnsZoneGetCommand builds `basaltic dns zone get`.
 func newDnsZoneGetCommand(state *cli.State) *cobra.Command {
+	var scope dns.ListZonesParams
 	cmd := &cobra.Command{
-		Use:   "get <zone-id>",
+		Use:   "get <ref>",
 		Short: "Get zone",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get zone.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetZone(cmd.Context(), args[0])
+			out, err := c.GetZoneByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -621,6 +626,7 @@ func newDnsZoneImportCommand(state *cli.State) *cobra.Command {
 
 // newDnsZoneListVpcAssociationsCommand builds `basaltic dns zone list-vpc-associations`.
 func newDnsZoneListVpcAssociationsCommand(state *cli.State) *cobra.Command {
+	var params dns.ListZoneVPCAssociationsParams
 	cmd := &cobra.Command{
 		Use:   "list-vpc-associations <zone-id>",
 		Short: "List VPC associations",
@@ -630,7 +636,7 @@ func newDnsZoneListVpcAssociationsCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListZoneVPCAssociations(cmd.Context(), args[0])
+			page, err := c.ListZoneVPCAssociations(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -639,6 +645,8 @@ func newDnsZoneListVpcAssociationsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact associated VPC CRN in the configured DNS region")
+	f.StringVar(&params.Name, "name", "", "Exact name of an associated VPC")
 	return cmd
 }
 

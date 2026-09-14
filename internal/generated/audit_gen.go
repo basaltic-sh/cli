@@ -94,6 +94,7 @@ func newAuditLogListCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&params.Action, "action", "", "Filter by action (exact match or prefix with wildcard, e.g., \"iam.*\")")
 	f.StringVar(&params.Actor, "actor", "", "Filter by a canonical UUID or an exact historical IAM actor CRN (user, service-account, or role, with empty region and account)")
 	f.StringVar(&params.ActorType, "actor-type", "", "Filter by actor type One of: \"user\", \"service_account\", \"system\"")
+	f.StringVar(&params.CRN, "crn", "", "Exact audit event CRN (crn:audit:::log/UUID)")
 	f.StringVar(&fromFlag, "from", "", "Filter logs from this timestamp (inclusive) (RFC 3339)")
 	f.StringVar(&params.IPAddress, "ip-address", "", "Filter by IP address")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
@@ -108,16 +109,18 @@ func newAuditLogListCommand(state *cli.State) *cobra.Command {
 
 // newAuditLogGetCommand builds `basaltic audit log get`.
 func newAuditLogGetCommand(state *cli.State) *cobra.Command {
+	var scope audit.ListAuditLogsParams
 	cmd := &cobra.Command{
-		Use:   "get <log-id>",
+		Use:   "get <ref>",
 		Short: "Get audit log entry",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get audit log entry.\n\n<ref> is its id or its CRN. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nThis resource has no name.\n\nA name is unique only within its parent: pass --actor or --resource with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := auditClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetAuditLog(cmd.Context(), args[0])
+			out, err := c.GetAuditLogByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -126,5 +129,7 @@ func newAuditLogGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&scope.Actor, "actor", "", "Filter by a canonical UUID or an exact historical IAM actor CRN (user, service-account, or role, with empty region and account)")
+	f.StringVar(&scope.Resource, "resource", "", "Filter by a canonical UUID or an event-time resource CRN, without looking up a live resource")
 	return cmd
 }

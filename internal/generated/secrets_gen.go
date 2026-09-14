@@ -89,16 +89,18 @@ func newSecretsSecretListCommand(state *cli.State) *cobra.Command {
 
 // newSecretsSecretGetCommand builds `basaltic secrets secret get`.
 func newSecretsSecretGetCommand(state *cli.State) *cobra.Command {
+	var scope secrets.ListSecretsParams
 	cmd := &cobra.Command{
-		Use:   "get <secret-id>",
+		Use:   "get <ref>",
 		Short: "Describe a secret (no value)",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Describe a secret (no value).\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := secretsClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.DescribeSecret(cmd.Context(), args[0])
+			out, err := c.DescribeSecretByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -308,6 +310,7 @@ func newSecretsSecretListVersionsCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact secret/name/version/number CRN; foreign or mismatched identities return an empty page")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum items to return")
 	f.StringVar(&params.Marker, "marker", "", "Marker")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")

@@ -8,6 +8,9 @@ import (
 
 // emitOperation writes one leaf command.
 func emitOperation(b *strings.Builder, svc service, r resourceGroup, op operation) error {
+	if op.Verb == "get" && op.ByReference != nil && len(op.PathParams) > 0 {
+		return emitByReferenceGet(b, svc, r, op)
+	}
 	fn := fmt.Sprintf("new%s%s%sCommand", exported(svc.Name), exported(r.Name), exported(op.Verb))
 
 	use := op.Verb

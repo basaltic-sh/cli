@@ -230,16 +230,18 @@ func newTelemetryLogGroupListCommand(state *cli.State) *cobra.Command {
 
 // newTelemetryLogGroupGetCommand builds `basaltic telemetry log-group get`.
 func newTelemetryLogGroupGetCommand(state *cli.State) *cobra.Command {
+	var scope telemetry.ListLogGroupsParams
 	cmd := &cobra.Command{
-		Use:   "get <id>",
+		Use:   "get <ref>",
 		Short: "Get a log group by id",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get a log group by id.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetLogGroup(cmd.Context(), args[0])
+			out, err := c.GetLogGroupByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}

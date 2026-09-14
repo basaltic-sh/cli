@@ -89,16 +89,18 @@ func newLoadbalancerListenerListCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerListenerGetCommand builds `basaltic loadbalancer listener get`.
 func newLoadbalancerListenerGetCommand(state *cli.State) *cobra.Command {
+	var scope loadbalancer.ListListenersParams
 	cmd := &cobra.Command{
-		Use:   "get <id> <listener-id>",
+		Use:   "get <id> <ref>",
 		Short: "Get a listener",
 		Args:  cobra.ExactArgs(2),
+		Long:  "Get a listener.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetListener(cmd.Context(), args[0], args[1])
+			out, err := c.GetListenerByReference(cmd.Context(), args[0], args[1], &scope)
 			if err != nil {
 				return err
 			}
@@ -378,16 +380,18 @@ func newLoadbalancerLoadBalancerListCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerLoadBalancerGetCommand builds `basaltic loadbalancer load-balancer get`.
 func newLoadbalancerLoadBalancerGetCommand(state *cli.State) *cobra.Command {
+	var scope loadbalancer.ListLoadBalancersParams
 	cmd := &cobra.Command{
-		Use:   "get <id>",
+		Use:   "get <ref>",
 		Short: "Get a load balancer",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get a load balancer.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetLoadBalancer(cmd.Context(), args[0])
+			out, err := c.GetLoadBalancerByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -607,16 +611,18 @@ func newLoadbalancerRuleListCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerRuleGetCommand builds `basaltic loadbalancer rule get`.
 func newLoadbalancerRuleGetCommand(state *cli.State) *cobra.Command {
+	var scope loadbalancer.ListRulesParams
 	cmd := &cobra.Command{
-		Use:   "get <id> <listener-id> <rule-id>",
+		Use:   "get <id> <listener-id> <ref>",
 		Short: "Get a routing rule",
 		Args:  cobra.ExactArgs(3),
+		Long:  "Get a routing rule.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetRule(cmd.Context(), args[0], args[1], args[2])
+			out, err := c.GetRuleByReference(cmd.Context(), args[0], args[1], args[2], &scope)
 			if err != nil {
 				return err
 			}
@@ -800,16 +806,18 @@ func newLoadbalancerTargetGroupListCommand(state *cli.State) *cobra.Command {
 
 // newLoadbalancerTargetGroupGetCommand builds `basaltic loadbalancer target-group get`.
 func newLoadbalancerTargetGroupGetCommand(state *cli.State) *cobra.Command {
+	var scope loadbalancer.ListTargetGroupsParams
 	cmd := &cobra.Command{
-		Use:   "get <id>",
+		Use:   "get <ref>",
 		Short: "Get a target group",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Get a target group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := c.GetTargetGroup(cmd.Context(), args[0])
+			out, err := c.GetTargetGroupByReference(cmd.Context(), args[0], &scope)
 			if err != nil {
 				return err
 			}
@@ -916,7 +924,7 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <id>",
-		Short: "Rename a target group or retune its health check, framing, or stickiness",
+		Short: "Update target group health checks, framing, or stickiness",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state)

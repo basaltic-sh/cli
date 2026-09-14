@@ -45,6 +45,19 @@ type operation struct {
 	ItemType   string  `json:"item_type"`
 	Paginated  bool    `json:"paginated"`
 	Idempotent bool    `json:"idempotent"`
+	// ByReference is set on a get whose resource also has a list: the SDK
+	// emits a Get<Resource>ByReference beside it, and the CLI's `get` takes
+	// a reference — id, CRN or name — instead of only an id.
+	ByReference *byReference `json:"by_reference"`
+}
+
+// byReference describes the SDK's Get<Resource>ByReference method.
+type byReference struct {
+	GoName          string  `json:"go_name"`
+	ListOperationID string  `json:"list_operation_id"`
+	ScopeType       string  `json:"scope_type"`
+	HasName         bool    `json:"has_name"`
+	ScopeParams     []field `json:"scope_params"`
 }
 
 type param struct {
