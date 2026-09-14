@@ -127,7 +127,6 @@ func newComputeImageCommand(state *cli.State) *cobra.Command {
 func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	var params compute.ListImagesParams
 	var allVersionsFlag bool
-	var includeHiddenFlag bool
 	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -141,9 +140,6 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("all-versions") {
 				params.AllVersions = &allVersionsFlag
-			}
-			if cmd.Flags().Changed("include-hidden") {
-				params.IncludeHidden = &includeHiddenFlag
 			}
 			if fetchAll {
 				return state.Printer().Iter(c.ListImagesAll(cmd.Context(), &params))
@@ -160,12 +156,11 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&allVersionsFlag, "all-versions", false, "Include builds a newer version has superseded")
 	f.StringVar(&params.Architecture, "architecture", "", "Architecture")
 	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
-	f.BoolVar(&includeHiddenFlag, "include-hidden", false, "Include the requesting account's hidden images for cleanup discovery")
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name match; an empty value matches no named resource")
 	f.StringVar(&params.OS, "os", "", "Os")
-	f.StringVar(&params.Status, "status", "", "One of: \"pending\", \"importing\", \"active\", \"error\", \"hidden\"")
+	f.StringVar(&params.Status, "status", "", "One of: \"pending\", \"importing\", \"active\", \"error\", \"deleting\", \"withdrawn\"")
 	f.StringVar(&params.Visibility, "visibility", "", "One of: \"public\", \"private\"")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
@@ -371,7 +366,7 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 func newComputeImageDeleteCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete <image-id>",
-		Short: "Delete (hide) an image",
+		Short: "Delete an unused image",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
