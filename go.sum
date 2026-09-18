@@ -1,5 +1,5 @@
-github.com/basaltic-sh/sdk-go v0.11.0 h1:22vZRXYMs0cQaWZJQxnFEgMMj3TvKSsjdMg7PJlkShs=
-github.com/basaltic-sh/sdk-go v0.11.0/go.mod h1:4IKJac9yJYJ4Mv+ppQm89Sn1v1ONTdrchJb5OKugewA=
+github.com/basaltic-sh/sdk-go v0.12.0 h1:+0dmmG+4Lciu45/rNDlzm/L4a0nNSoiB23gAQueoM7Q=
+github.com/basaltic-sh/sdk-go v0.12.0/go.mod h1:4IKJac9yJYJ4Mv+ppQm89Sn1v1ONTdrchJb5OKugewA=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
