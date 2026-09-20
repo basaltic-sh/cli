@@ -50,7 +50,8 @@ type Printer struct {
 	NoHeaders bool
 }
 
-// Value renders a single result.
+// Value renders a single result. A slice — an operation that lists without
+// paginating, such as an instance's volumes — is a table, like a page.
 func (p *Printer) Value(v any) error {
 	if v == nil || isNilPointer(v) {
 		return nil
@@ -60,6 +61,9 @@ func (p *Printer) Value(v any) error {
 		return p.writeJSON(v)
 	case YAML:
 		return p.writeYAML(v)
+	}
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Slice {
+		return p.writeTable(rv)
 	}
 	return p.writeFields(v)
 }
@@ -192,14 +196,32 @@ func (p *Printer) writeTable(items reflect.Value) error {
 		return nil
 	}
 	rows := make([]map[string]any, 0, items.Len())
+	var cols []string
 	for i := 0; i < items.Len(); i++ {
-		m, err := toMap(items.Index(i).Interface())
+		item := items.Index(i).Interface()
+		if pr := presenterFor(item); pr != nil {
+			fields := pr(item)
+			m := make(map[string]any, len(fields))
+			for _, f := range fields {
+				m[f.Key] = f.Value
+			}
+			rows = append(rows, m)
+			if cols == nil {
+				for _, f := range fields {
+					cols = append(cols, f.Key)
+				}
+			}
+			continue
+		}
+		m, err := toMap(item)
 		if err != nil {
 			return err
 		}
 		rows = append(rows, m)
 	}
-	cols := chooseColumns(rows)
+	if cols == nil {
+		cols = chooseColumns(rows)
+	}
 
 	tw := tabwriter.NewWriter(p.Out, 0, 0, 3, ' ', 0)
 	if !p.NoHeaders {
@@ -217,6 +239,42 @@ func (p *Printer) writeTable(items reflect.Value) error {
 		fmt.Fprintln(tw, strings.Join(cells, "\t"))
 	}
 	return tw.Flush()
+}
+
+// Field is one cell a presenter hands the table: the column, in the order the
+// presenter lists them, and the value as the text renderer should print it.
+type Field struct {
+	Key   string
+	Value any
+}
+
+// Presenter turns one result into the row a table shows for it.
+//
+// The reflection renderer sees only an object's scalar fields, so a result
+// whose meaning sits one level down — a volume attachment's `mount` report,
+// which is an object — would lose it from the table. A presenter registered
+// for the result's type says what the row is instead, in text output only;
+// json and yaml always carry the whole object.
+type Presenter func(v any) []Field
+
+var presenters = map[reflect.Type]Presenter{}
+
+// Present registers pr for results of v's type (the type itself and a pointer
+// to it), so a table of them is rendered through pr.
+func Present(v any, pr Presenter) {
+	t := reflect.TypeOf(v)
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	presenters[t] = pr
+	presenters[reflect.PointerTo(t)] = pr
+}
+
+func presenterFor(v any) Presenter {
+	if v == nil {
+		return nil
+	}
+	return presenters[reflect.TypeOf(v)]
 }
 
 // preferredColumns are shown first when a result has them. The order is what

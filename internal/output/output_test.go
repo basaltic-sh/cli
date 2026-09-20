@@ -167,3 +167,64 @@ func sliceSeq[T any](items []T) func(func(T, error) bool) {
 		}
 	}
 }
+
+func TestValueRendersASliceAsATable(t *testing.T) {
+	p, out, _ := newPrinter(Text)
+	items := []widget{{ID: "w-1", Name: "alpha", Status: "active"}, {ID: "w-2", Name: "beta", Status: "pending"}}
+	if err := p.Value(items); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 3 || !strings.HasPrefix(lines[0], "ID") {
+		t.Errorf("a slice should print as a table with a header and one row per item, got:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "value:") {
+		t.Errorf("a slice must not print as a single field, got:\n%s", out.String())
+	}
+}
+
+type reported struct {
+	ID     string  `json:"id"`
+	Report *report `json:"report,omitempty"`
+}
+
+type report struct {
+	State string `json:"state"`
+}
+
+func TestPresenterShapesTheRowInTextOnly(t *testing.T) {
+	Present(reported{}, func(v any) []Field {
+		r := v.(*reported)
+		state := "not reported"
+		if r.Report != nil {
+			state = r.Report.State
+		}
+		return []Field{{Key: "id", Value: r.ID}, {Key: "report_state", Value: state}}
+	})
+	items := []*reported{{ID: "r-1"}, {ID: "r-2", Report: &report{State: "mounted"}}}
+
+	p, out, _ := newPrinter(Text)
+	if err := p.Value(items); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 3 || !strings.HasPrefix(lines[0], "ID") || !strings.Contains(lines[0], "REPORT_STATE") {
+		t.Errorf("the presenter's columns should head the table, got:\n%s", out.String())
+	}
+	if !strings.Contains(lines[1], "not reported") || !strings.Contains(lines[2], "mounted") {
+		t.Errorf("rows should come from the presenter, got:\n%s", out.String())
+	}
+
+	// json carries the object as the API sent it, presenter or not.
+	p, out, _ = newPrinter(JSON)
+	if err := p.Value(items); err != nil {
+		t.Fatal(err)
+	}
+	var got []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got[1]["report"].(map[string]any); !ok || got[1]["report_state"] != nil {
+		t.Errorf("json must keep the nested object and not the presenter's row, got %v", got[1])
+	}
+}
