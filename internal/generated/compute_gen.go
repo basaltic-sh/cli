@@ -29,6 +29,7 @@ func newComputeCommand(state *cli.State) *cobra.Command {
 	}
 	cmd.AddCommand(newComputeFlavorCommand(state))
 	cmd.AddCommand(newComputeImageCommand(state))
+	cmd.AddCommand(newComputeImageCatalogCommand(state))
 	cmd.AddCommand(newComputeInstanceCommand(state))
 	cmd.AddCommand(newComputeInstancePoolCommand(state))
 	cmd.AddCommand(newComputeKeypairCommand(state))
@@ -161,7 +162,6 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name match; an empty value matches no named resource")
 	f.StringVar(&params.OS, "os", "", "Os")
 	f.StringVar(&params.Status, "status", "", "One of: \"pending\", \"importing\", \"active\", \"error\", \"deleting\", \"withdrawn\"")
-	f.StringVar(&params.Visibility, "visibility", "", "One of: \"public\", \"private\"")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -206,7 +206,6 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	var osVersionFlag string
 	var tagsFlag string
 	var versionFlag string
-	var visibilityFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -260,9 +259,6 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("version") {
 				body.Version = &versionFlag
 			}
-			if cmd.Flags().Changed("visibility") {
-				body.Visibility = &visibilityFlag
-			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
@@ -292,7 +288,6 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("source-url")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&versionFlag, "version", "", "Identifies this build within name, and must be unique there — re-publishing a version that a tag already carries is a 409")
-	f.StringVar(&visibilityFlag, "visibility", "", "Visibility (one of: public, private)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -306,7 +301,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 	var descriptionFlag string
 	var eolDateFlag string
 	var tagsFlag string
-	var visibilityFlag string
 	cmd := &cobra.Command{
 		Use:   "update <image-id>",
 		Short: "Update an image's metadata",
@@ -340,9 +334,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			if cmd.Flags().Changed("visibility") {
-				body.Visibility = &visibilityFlag
-			}
 			out, err := c.UpdateImage(cmd.Context(), args[0], &body)
 			if err != nil {
 				return err
@@ -358,7 +349,6 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&eolDateFlag, "eol-date", "", "Set the release's end-of-life date")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&visibilityFlag, "visibility", "", "Visibility (one of: public, private)")
 	return cmd
 }
 
@@ -382,6 +372,52 @@ func newComputeImageDeleteCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newComputeImageCatalogCommand builds `basaltic compute image-catalog`.
+func newComputeImageCatalogCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "image-catalog",
+		Short:   "Image catalogs",
+		Aliases: []string{"image-catalogs"},
+	}
+	cmd.AddCommand(newComputeImageCatalogListCommand(state))
+	return cmd
+}
+
+// newComputeImageCatalogListCommand builds `basaltic compute image-catalog list`.
+func newComputeImageCatalogListCommand(state *cli.State) *cobra.Command {
+	var params compute.ListImageCatalogParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List the launch image catalog",
+		Args:  cobra.ExactArgs(0),
+		Long:  "List the launch image catalog.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := computeClient(state)
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListImageCatalogAll(cmd.Context(), &params))
+			}
+			page, err := c.ListImageCatalog(cmd.Context(), &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.Architecture, "architecture", "", "Architecture")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact image name")
+	f.StringVar(&params.OS, "os", "", "Os")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
@@ -653,16 +689,12 @@ func newComputeInstanceDeleteCommand(state *cli.State) *cobra.Command {
 func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 	var body compute.AttachInstanceNICRequest
 	var bodyFile string
-	var interfaceFlag string
-	var ipAddressFlag string
-	var macFlag string
-	var subnetFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "attach-nic <instance-id>",
-		Short: "Attach a NIC to a running instance",
+		Short: "Attach an existing NIC to an instance",
 		Args:  cobra.ExactArgs(1),
-		Long:  "Attach a NIC to a running instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		Long:  "Attach an existing NIC to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
 			if err != nil {
@@ -672,18 +704,6 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
 				}
-			}
-			if cmd.Flags().Changed("interface") {
-				body.Interface = &interfaceFlag
-			}
-			if cmd.Flags().Changed("ip-address") {
-				body.IPAddress = &ipAddressFlag
-			}
-			if cmd.Flags().Changed("mac") {
-				body.MAC = &macFlag
-			}
-			if cmd.Flags().Changed("subnet") {
-				body.Subnet = &subnetFlag
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -699,11 +719,8 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&interfaceFlag, "interface", "", "Existing standalone interface UUID or complete VPC/subnet/interface CRN")
-	f.StringVar(&ipAddressFlag, "ip-address", "", "Ip address")
-	f.StringVar(&macFlag, "mac", "", "Mac")
-	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security groups")
-	f.StringVar(&subnetFlag, "subnet", "", "Subnet UUID or complete VPC/subnet CRN; a bare name requires a VPC parent and is rejected here")
+	f.StringVar(&body.Interface, "interface", "", "Existing standalone interface UUID or complete VPC/subnet/interface CRN")
+	_ = cmd.MarkFlagRequired("interface")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
