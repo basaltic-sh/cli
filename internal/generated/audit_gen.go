@@ -92,7 +92,7 @@ func newAuditLogListCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.Action, "action", "", "Filter by action (exact match or prefix with wildcard, e.g., \"iam.*\")")
-	f.StringVar(&params.Actor, "actor", "", "Filter by a canonical UUID or an exact historical IAM actor CRN (user, service-account, or role, with empty region and account)")
+	f.StringVar(&params.Actor, "actor", "", "Filter by a canonical UUID or an exact event-time actor CRN, including Workspace users, account IAM identities, and retained historical CRNs")
 	f.StringVar(&params.ActorType, "actor-type", "", "Filter by actor type One of: \"user\", \"service_account\", \"system\"")
 	f.StringVar(&params.CRN, "crn", "", "Exact audit event CRN (crn:audit:::log/UUID)")
 	f.StringVar(&fromFlag, "from", "", "Filter logs from this timestamp (inclusive) (RFC 3339)")
@@ -129,7 +129,7 @@ func newAuditLogGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&scope.Actor, "actor", "", "Filter by a canonical UUID or an exact historical IAM actor CRN (user, service-account, or role, with empty region and account)")
+	f.StringVar(&scope.Actor, "actor", "", "Filter by a canonical UUID or an exact event-time actor CRN, including Workspace users, account IAM identities, and retained historical CRNs")
 	f.StringVar(&scope.Resource, "resource", "", "Filter by a canonical UUID or an event-time resource CRN, without looking up a live resource")
 	return cmd
 }

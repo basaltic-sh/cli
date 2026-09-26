@@ -64,7 +64,7 @@ basaltic compute instance start i-abc123
 basaltic network vpc create --name prod --cidr-v4 10.0.0.0/16
 basaltic storage volume list
 basaltic loadbalancer listener create lb-1 --port 443
-basaltic iam user list
+basaltic workspace user list
 ```
 
 Positional arguments are the resource's identifiers, in the order the API's

@@ -25,7 +25,7 @@ var serviceShort = map[string]string{
 	"compute":      "Instances, images, flavors, keypairs and pools",
 	"database":     "Managed database clusters",
 	"dns":          "DNS zones and records",
-	"iam":          "Identity, access, accounts and organizations",
+	"iam":          "Account roles, policies, service accounts and sessions",
 	"kms":          "Encryption keys",
 	"loadbalancer": "Load balancers, listeners, rules and target groups",
 	"network":      "VPCs, subnets, gateways, routes and security groups",
@@ -33,6 +33,7 @@ var serviceShort = map[string]string{
 	"secrets":      "Secrets and their versions",
 	"storage":      "Volumes, snapshots, buckets and objects",
 	"telemetry":    "Logs, metrics and traces",
+	"workspace":    "Organizations, accounts, people, groups and organization policies",
 }
 
 // exported renders a name as an exported Go identifier, matching the SDK's

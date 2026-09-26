@@ -121,14 +121,14 @@ func TestTreeIsServiceResourceVerb(t *testing.T) {
 	}
 	for _, want := range []string{
 		"audit", "billing", "certificate", "compute", "dns", "iam",
-		"kms", "loadbalancer", "network", "quota", "secrets", "storage", "telemetry",
+		"kms", "loadbalancer", "network", "quota", "secrets", "storage", "telemetry", "workspace",
 	} {
 		if !services[want] {
 			t.Errorf("no top-level command for the %s service", want)
 		}
 	}
-	if len(services) != 13 {
-		t.Errorf("found %d services at the top level, want 13", len(services))
+	if len(services) != 14 {
+		t.Errorf("found %d services at the top level, want 14", len(services))
 	}
 
 	// Nothing that is not part of the release should be reachable.
@@ -206,5 +206,36 @@ func TestCreatesOfferIdempotencyAndAFileBody(t *testing.T) {
 	}
 	if f := cmd.Flags().Lookup("name"); f == nil {
 		t.Error("create has no --name")
+	}
+}
+
+func TestWorkspaceMigrationCommandBoundaries(t *testing.T) {
+	root := rootCommand(t)
+	for _, path := range []string{
+		"workspace user list",
+		"workspace group list",
+		"workspace policy list",
+		"workspace role attach-policy",
+		"workspace service-account attach-policy",
+		"workspace account assign-role-assignment",
+		"workspace account-role list",
+		"iam role list",
+		"iam policy list",
+		"iam service-account list",
+	} {
+		cmd, remaining, err := root.Find(strings.Fields(path))
+		if err != nil || len(remaining) != 0 || !cmd.Runnable() {
+			t.Errorf("%q is not reachable: %v, remaining %v", path, err, remaining)
+		}
+	}
+	for _, path := range []string{
+		"iam user", "iam group", "iam account", "iam organization", "iam invitation",
+		"iam service-account add-group", "iam service-account list-groups",
+		"workspace group list-service-accounts",
+	} {
+		_, remaining, err := root.Find(strings.Fields(path))
+		if err == nil && len(remaining) == 0 {
+			t.Errorf("retired command %q is still reachable", path)
+		}
 	}
 }
