@@ -597,7 +597,7 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name)")
 	_ = cmd.MarkFlagRequired("flavor")
-	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach this organization-scoped IAM role by UUID, CRN or exact name")
+	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach an IAM role from the same account by UUID, CRN or exact name")
 	f.StringVar(&imageFlag, "image", "", "Image to clone the boot disk from (required if not booting from volume)")
 	f.StringSliceVar(&body.Keypairs, "keypairs", nil, "Keypairs")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
