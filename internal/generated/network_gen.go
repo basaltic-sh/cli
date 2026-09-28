@@ -694,7 +694,7 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&addressesFlag, "addresses", "", "Omit to allocate the subnet enabled families (JSON)")
+	f.StringVar(&addressesFlag, "addresses", "", "Every enabled subnet family is allocated automatically (JSON)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&macFlag, "mac", "", "Defaults to a fresh locally-administered EUI-48")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
@@ -2405,7 +2405,9 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var allocateCidriPv6Flag bool
 	var cidriPv6Flag string
+	var copyIPv4securityRulesFlag bool
 	var descriptionFlag string
+	var iPv6routingFlag string
 	var routeTableFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -2428,8 +2430,14 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("cidr-ipv6") {
 				body.CIDRIPv6 = &cidriPv6Flag
 			}
+			if cmd.Flags().Changed("copy-ipv4-security-rules") {
+				body.CopyIPv4SecurityRules = &copyIPv4securityRulesFlag
+			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
+			}
+			if cmd.Flags().Changed("ipv6-routing") {
+				body.IPv6Routing = &iPv6routingFlag
 			}
 			if cmd.Flags().Changed("route-table") {
 				body.RouteTable = &routeTableFlag
@@ -2451,7 +2459,9 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a free /64 from the VPC IPv6 range")
 	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "An aligned /64 inside the VPC IPv6 range")
+	f.BoolVar(&copyIPv4securityRulesFlag, "copy-ipv4-security-rules", false, "When enabling IPv6, copy equivalent rules in security groups used by this subnet's interfaces")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&iPv6routingFlag, "ipv6-routing", "", "When enabling IPv6, optionally add ::/0 to the subnet's route table (one of: match_ipv4, unchanged, internet_gateway, nat_gateway, egress_only_gateway)")
 	f.StringVar(&routeTableFlag, "route-table", "", "Route-table UUID, nested CRN or exact name within the subnet VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
