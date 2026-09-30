@@ -37,8 +37,8 @@ func newComputeCommand(state *cli.State) *cobra.Command {
 }
 
 // computeClient builds the service client, resolving credentials on first use.
-func computeClient(state *cli.State) (*compute.Client, error) {
-	cfg, err := state.SDK()
+func computeClient(state *cli.State, path string) (*compute.Client, error) {
+	cfg, err := state.ServiceSDK("compute", path)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func newComputeFlavorListCommand(state *cli.State) *cobra.Command {
 		Short: "List flavors",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/flavors")
 			if err != nil {
 				return err
 			}
@@ -93,7 +93,7 @@ func newComputeFlavorGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get flavor.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/flavors/{flavor_id}")
 			if err != nil {
 				return err
 			}
@@ -135,7 +135,7 @@ func newComputeImageListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List images.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/images")
 			if err != nil {
 				return err
 			}
@@ -175,7 +175,7 @@ func newComputeImageGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get an image.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/images/{image_id}")
 			if err != nil {
 				return err
 			}
@@ -213,7 +213,7 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Import an image from an object URL.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/images")
 			if err != nil {
 				return err
 			}
@@ -306,7 +306,7 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update an image's metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/images/{image_id}")
 			if err != nil {
 				return err
 			}
@@ -359,7 +359,7 @@ func newComputeImageDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete an unused image",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/images/{image_id}")
 			if err != nil {
 				return err
 			}
@@ -396,7 +396,7 @@ func newComputeImageCatalogListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List the launch image catalog.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/image-catalog")
 			if err != nil {
 				return err
 			}
@@ -461,7 +461,7 @@ func newComputeInstanceListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List instances.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances")
 			if err != nil {
 				return err
 			}
@@ -497,7 +497,7 @@ func newComputeInstanceGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get instance.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --flavor or --image with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}")
 			if err != nil {
 				return err
 			}
@@ -535,7 +535,7 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances")
 			if err != nil {
 				return err
 			}
@@ -625,7 +625,7 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update instance",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}")
 			if err != nil {
 				return err
 			}
@@ -674,7 +674,7 @@ func newComputeInstanceDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete instance",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}")
 			if err != nil {
 				return err
 			}
@@ -701,7 +701,7 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach an existing NIC to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/nics")
 			if err != nil {
 				return err
 			}
@@ -744,7 +744,7 @@ func newComputeInstanceAttachVolumeCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a data volume to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes")
 			if err != nil {
 				return err
 			}
@@ -793,7 +793,7 @@ func newComputeInstanceConsoleOutputCommand(state *cli.State) *cobra.Command {
 		Short: "Get the instance's serial console output",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/console/output")
 			if err != nil {
 				return err
 			}
@@ -817,7 +817,7 @@ func newComputeInstanceConsoleScreenshotCommand(state *cli.State) *cobra.Command
 		Short: "Capture the instance's display",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/console/screenshot")
 			if err != nil {
 				return err
 			}
@@ -840,7 +840,7 @@ func newComputeInstanceConsoleTicketCommand(state *cli.State) *cobra.Command {
 		Short: "Mint a ticket for the serial console",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/console/ticket")
 			if err != nil {
 				return err
 			}
@@ -863,7 +863,7 @@ func newComputeInstanceDetachNicCommand(state *cli.State) *cobra.Command {
 		Short: "Detach a NIC from a running instance",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/nics/{interface_id}")
 			if err != nil {
 				return err
 			}
@@ -886,7 +886,7 @@ func newComputeInstanceDetachVolumeCommand(state *cli.State) *cobra.Command {
 		Short: "Detach a data volume from an instance",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes/{volume_id}")
 			if err != nil {
 				return err
 			}
@@ -910,7 +910,7 @@ func newComputeInstanceListNicsCommand(state *cli.State) *cobra.Command {
 		Short: "List the instance's network interfaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/nics")
 			if err != nil {
 				return err
 			}
@@ -936,7 +936,7 @@ func newComputeInstanceListVolumesCommand(state *cli.State) *cobra.Command {
 		Short: "List the instance's attached volumes",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes")
 			if err != nil {
 				return err
 			}
@@ -966,7 +966,7 @@ func newComputeInstanceRebootCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Reboot instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/reboot")
 			if err != nil {
 				return err
 			}
@@ -1011,7 +1011,7 @@ func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Reinstall instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/reinstall")
 			if err != nil {
 				return err
 			}
@@ -1061,7 +1061,7 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Resize instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/resize")
 			if err != nil {
 				return err
 			}
@@ -1099,7 +1099,7 @@ func newComputeInstanceStartCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Start instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/start")
 			if err != nil {
 				return err
 			}
@@ -1129,7 +1129,7 @@ func newComputeInstanceStopCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Stop instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/stop")
 			if err != nil {
 				return err
 			}
@@ -1159,7 +1159,7 @@ func newComputeInstanceUpdateVolumeCommand(state *cli.State) *cobra.Command {
 		Short: "Update a volume attachment's settings",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes/{volume_id}")
 			if err != nil {
 				return err
 			}
@@ -1213,7 +1213,7 @@ func newComputeInstancePoolListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List instance pools.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools")
 			if err != nil {
 				return err
 			}
@@ -1246,7 +1246,7 @@ func newComputeInstancePoolGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get an instance pool.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}")
 			if err != nil {
 				return err
 			}
@@ -1279,7 +1279,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create an instance pool.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools")
 			if err != nil {
 				return err
 			}
@@ -1352,7 +1352,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update an instance pool's description, size, tags or launch template",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}")
 			if err != nil {
 				return err
 			}
@@ -1409,7 +1409,7 @@ func newComputeInstancePoolDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete an instance pool",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}")
 			if err != nil {
 				return err
 			}
@@ -1436,7 +1436,7 @@ func newComputeInstancePoolAttachFloatingIpCommand(state *cli.State) *cobra.Comm
 		Args:  cobra.ExactArgs(1),
 		Long:  "Give the pool a shared public address.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/floating-ips")
 			if err != nil {
 				return err
 			}
@@ -1472,7 +1472,7 @@ func newComputeInstancePoolDetachFloatingIpCommand(state *cli.State) *cobra.Comm
 		Short: "Take a shared address off the pool",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/floating-ips/{floating_ip_id}")
 			if err != nil {
 				return err
 			}
@@ -1498,7 +1498,7 @@ func newComputeInstancePoolListFloatingIpsCommand(state *cli.State) *cobra.Comma
 		Args:  cobra.ExactArgs(1),
 		Long:  "List the pool's shared public addresses.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/floating-ips")
 			if err != nil {
 				return err
 			}
@@ -1532,7 +1532,7 @@ func newComputeInstancePoolListInstancesCommand(state *cli.State) *cobra.Command
 		Args:  cobra.ExactArgs(1),
 		Long:  "List a pool's instances.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/instances")
 			if err != nil {
 				return err
 			}
@@ -1566,7 +1566,7 @@ func newComputeInstancePoolRefreshCommand(state *cli.State) *cobra.Command {
 		Short: "Roll every member onto the pool's current launch template",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/refresh")
 			if err != nil {
 				return err
 			}
@@ -1606,7 +1606,7 @@ func newComputeKeypairListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List keypairs.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/keypairs")
 			if err != nil {
 				return err
 			}
@@ -1639,7 +1639,7 @@ func newComputeKeypairGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get keypair.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/keypairs/{keypair_id}")
 			if err != nil {
 				return err
 			}
@@ -1668,7 +1668,7 @@ func newComputeKeypairCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create keypair.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/keypairs")
 			if err != nil {
 				return err
 			}
@@ -1714,7 +1714,7 @@ func newComputeKeypairDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete keypair",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state)
+			c, err := computeClient(state, "/v1/keypairs/{keypair_id}")
 			if err != nil {
 				return err
 			}

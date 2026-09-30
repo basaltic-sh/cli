@@ -36,8 +36,8 @@ func newBillingCommand(state *cli.State) *cobra.Command {
 }
 
 // billingClient builds the service client, resolving credentials on first use.
-func billingClient(state *cli.State) (*billing.Client, error) {
-	cfg, err := state.SDK()
+func billingClient(state *cli.State, path string) (*billing.Client, error) {
+	cfg, err := state.ServiceSDK("billing", path)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func newBillingCreditListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List credit grants.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/credits")
 			if err != nil {
 				return err
 			}
@@ -108,7 +108,7 @@ func newBillingFiscalInvoiceListCommand(state *cli.State) *cobra.Command {
 		Short: "List fiscal invoice issuance and delivery status",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/fiscal-invoices")
 			if err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ func newBillingFiscalInvoiceGetXmlCommand(state *cli.State) *cobra.Command {
 		Short: "Download issued NFS-e XML",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/fiscal-invoices/{document_id}/xml")
 			if err != nil {
 				return err
 			}
@@ -171,7 +171,7 @@ func newBillingInvoiceListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List invoices.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/invoices")
 			if err != nil {
 				return err
 			}
@@ -203,7 +203,7 @@ func newBillingInvoiceGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get an invoice with its line items.\n\n<ref> is its id or its CRN. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nThis resource has no name.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/invoices/{invoice_id}")
 			if err != nil {
 				return err
 			}
@@ -226,7 +226,7 @@ func newBillingInvoiceGetPdfCommand(state *cli.State) *cobra.Command {
 		Short: "Download an invoice as a PDF statement",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/invoices/{invoice_id}/pdf")
 			if err != nil {
 				return err
 			}
@@ -263,7 +263,7 @@ func newBillingPaymentListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List invoice payments.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/payments")
 			if err != nil {
 				return err
 			}
@@ -306,7 +306,7 @@ func newBillingPriceListCommand(state *cli.State) *cobra.Command {
 		Short: "List catalog prices",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/prices")
 			if err != nil {
 				return err
 			}
@@ -353,7 +353,7 @@ func newBillingProfileListCommand(state *cli.State) *cobra.Command {
 		Short: "Read the organization billing profile",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/profile")
 			if err != nil {
 				return err
 			}
@@ -378,7 +378,7 @@ func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Save organization billing details",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/profile")
 			if err != nil {
 				return err
 			}
@@ -439,7 +439,7 @@ func newBillingTransactionListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List ledger transactions.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/transactions")
 			if err != nil {
 				return err
 			}
@@ -480,7 +480,7 @@ func newBillingUsageListCommand(state *cli.State) *cobra.Command {
 		Short: "Get month-to-date usage total",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := billingClient(state)
+			c, err := billingClient(state, "/v1/usage")
 			if err != nil {
 				return err
 			}

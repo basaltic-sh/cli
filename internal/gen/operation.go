@@ -44,7 +44,7 @@ func emitOperation(b *strings.Builder, svc service, r resourceGroup, op operatio
 		fmt.Fprintf(b, "\t\tLong: %s,\n", quote(long))
 	}
 	b.WriteString("\t\tRunE: func(cmd *cobra.Command, args []string) error {\n")
-	fmt.Fprintf(b, "\t\t\tc, err := %sClient(state)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", unexported(svc.Name))
+	fmt.Fprintf(b, "\t\t\tc, err := %sClient(state, %q)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", unexported(svc.Name), op.Path)
 	for _, a := range applies {
 		b.WriteString("\t\t\t" + strings.ReplaceAll(a, "\n", "\n\t\t\t") + "\n")
 	}

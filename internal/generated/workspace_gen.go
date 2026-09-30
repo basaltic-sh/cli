@@ -39,8 +39,8 @@ func newWorkspaceCommand(state *cli.State) *cobra.Command {
 }
 
 // workspaceClient builds the service client, resolving credentials on first use.
-func workspaceClient(state *cli.State) (*workspace.Client, error) {
-	cfg, err := state.SDK()
+func workspaceClient(state *cli.State, path string) (*workspace.Client, error) {
+	cfg, err := state.ServiceSDK("workspace", path)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func newWorkspaceAccountListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List accounts.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts")
 			if err != nil {
 				return err
 			}
@@ -109,7 +109,7 @@ func newWorkspaceAccountGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get account.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}")
 			if err != nil {
 				return err
 			}
@@ -137,7 +137,7 @@ func newWorkspaceAccountCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts")
 			if err != nil {
 				return err
 			}
@@ -183,7 +183,7 @@ func newWorkspaceAccountUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}")
 			if err != nil {
 				return err
 			}
@@ -220,7 +220,7 @@ func newWorkspaceAccountDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}")
 			if err != nil {
 				return err
 			}
@@ -245,7 +245,7 @@ func newWorkspaceAccountAssignRoleAssignmentCommand(state *cli.State) *cobra.Com
 		Short: "Assign account role",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/role-assignments")
 			if err != nil {
 				return err
 			}
@@ -280,7 +280,7 @@ func newWorkspaceAccountGetResourceCommand(state *cli.State) *cobra.Command {
 		Short: "Check account resource presence",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/resources")
 			if err != nil {
 				return err
 			}
@@ -303,7 +303,7 @@ func newWorkspaceAccountListRoleAssignmentsCommand(state *cli.State) *cobra.Comm
 		Short: "List account role assignments",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/role-assignments")
 			if err != nil {
 				return err
 			}
@@ -326,7 +326,7 @@ func newWorkspaceAccountRemoveRoleAssignmentCommand(state *cli.State) *cobra.Com
 		Short: "Remove account role assignment",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/role-assignments/{assignment_id}")
 			if err != nil {
 				return err
 			}
@@ -357,10 +357,10 @@ func newWorkspaceAccountRoleCommand(state *cli.State) *cobra.Command {
 func newWorkspaceAccountRoleListCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List available account roles",
+		Short: "List assigned account roles",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/account-roles")
 			if err != nil {
 				return err
 			}
@@ -409,7 +409,7 @@ func newWorkspaceGroupListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List groups.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups")
 			if err != nil {
 				return err
 			}
@@ -442,7 +442,7 @@ func newWorkspaceGroupGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}")
 			if err != nil {
 				return err
 			}
@@ -470,7 +470,7 @@ func newWorkspaceGroupCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups")
 			if err != nil {
 				return err
 			}
@@ -513,7 +513,7 @@ func newWorkspaceGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}")
 			if err != nil {
 				return err
 			}
@@ -546,7 +546,7 @@ func newWorkspaceGroupDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}")
 			if err != nil {
 				return err
 			}
@@ -573,7 +573,7 @@ func newWorkspaceGroupAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -609,7 +609,7 @@ func newWorkspaceGroupDeleteInlinePolicyCommand(state *cli.State) *cobra.Command
 		Short: "Delete a group's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -632,7 +632,7 @@ func newWorkspaceGroupDetachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Detach policy from group",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -655,7 +655,7 @@ func newWorkspaceGroupGetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Get a group's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -679,7 +679,7 @@ func newWorkspaceGroupListInlinePoliciesCommand(state *cli.State) *cobra.Command
 		Short: "List a group's inline policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/inline-policies")
 			if err != nil {
 				return err
 			}
@@ -705,7 +705,7 @@ func newWorkspaceGroupListPoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List group policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -733,7 +733,7 @@ func newWorkspaceGroupListUsersCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List group users.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/users")
 			if err != nil {
 				return err
 			}
@@ -767,7 +767,7 @@ func newWorkspaceGroupSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Create or replace a group's inline policy",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/groups/{group_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -819,7 +819,7 @@ func newWorkspaceInvitationListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List invitations.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/invitations")
 			if err != nil {
 				return err
 			}
@@ -852,7 +852,7 @@ func newWorkspaceInvitationGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get invitation.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/invitations/{invitation_id}")
 			if err != nil {
 				return err
 			}
@@ -875,7 +875,7 @@ func newWorkspaceInvitationCancelCommand(state *cli.State) *cobra.Command {
 		Short: "Cancel invitation",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/invitations/{invitation_id}")
 			if err != nil {
 				return err
 			}
@@ -915,7 +915,7 @@ func newWorkspaceOrganizationListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List organizations.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/organizations")
 			if err != nil {
 				return err
 			}
@@ -946,7 +946,7 @@ func newWorkspaceOrganizationGetCommand(state *cli.State) *cobra.Command {
 		Short: "Get organization",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/organizations/{organization_id}")
 			if err != nil {
 				return err
 			}
@@ -973,7 +973,7 @@ func newWorkspaceOrganizationUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update organization",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/organizations/{organization_id}")
 			if err != nil {
 				return err
 			}
@@ -1012,7 +1012,7 @@ func newWorkspaceOrganizationDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete organization",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/organizations/{organization_id}")
 			if err != nil {
 				return err
 			}
@@ -1057,7 +1057,7 @@ func newWorkspacePolicyListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List policies.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies")
 			if err != nil {
 				return err
 			}
@@ -1090,7 +1090,7 @@ func newWorkspacePolicyGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1120,7 +1120,7 @@ func newWorkspacePolicyCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies")
 			if err != nil {
 				return err
 			}
@@ -1178,7 +1178,7 @@ func newWorkspacePolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1223,7 +1223,7 @@ func newWorkspacePolicyDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1249,7 +1249,7 @@ func newWorkspacePolicyListGroupsCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List groups with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}/groups")
 			if err != nil {
 				return err
 			}
@@ -1283,7 +1283,7 @@ func newWorkspacePolicyListRolesCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List roles with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}/roles")
 			if err != nil {
 				return err
 			}
@@ -1317,7 +1317,7 @@ func newWorkspacePolicyListServiceAccountsCommand(state *cli.State) *cobra.Comma
 		Args:  cobra.ExactArgs(1),
 		Long:  "List service accounts with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}/service-accounts")
 			if err != nil {
 				return err
 			}
@@ -1351,7 +1351,7 @@ func newWorkspacePolicyListUsersCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List users with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/policies/{policy_id}/users")
 			if err != nil {
 				return err
 			}
@@ -1399,7 +1399,7 @@ func newWorkspaceRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1435,7 +1435,7 @@ func newWorkspaceRoleDetachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Detach policy from role",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/roles/{role_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1459,7 +1459,7 @@ func newWorkspaceRoleListPoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List role policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1501,7 +1501,7 @@ func newWorkspaceServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Comm
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1537,7 +1537,7 @@ func newWorkspaceServiceAccountDetachPolicyCommand(state *cli.State) *cobra.Comm
 		Short: "Detach policy from service account",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/service-accounts/{service_account_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1561,7 +1561,7 @@ func newWorkspaceServiceAccountListPoliciesCommand(state *cli.State) *cobra.Comm
 		Short: "List service account policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1616,7 +1616,7 @@ func newWorkspaceUserListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List users.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users")
 			if err != nil {
 				return err
 			}
@@ -1649,7 +1649,7 @@ func newWorkspaceUserGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get user.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}")
 			if err != nil {
 				return err
 			}
@@ -1678,7 +1678,7 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Add user to organization.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users")
 			if err != nil {
 				return err
 			}
@@ -1730,7 +1730,7 @@ func newWorkspaceUserAddGroupCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Add user to group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/groups")
 			if err != nil {
 				return err
 			}
@@ -1770,7 +1770,7 @@ func newWorkspaceUserAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to user.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1806,7 +1806,7 @@ func newWorkspaceUserDeleteInlinePolicyCommand(state *cli.State) *cobra.Command 
 		Short: "Delete a user's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -1829,7 +1829,7 @@ func newWorkspaceUserDetachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Detach policy from user",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1852,7 +1852,7 @@ func newWorkspaceUserGetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Get a user's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -1875,7 +1875,7 @@ func newWorkspaceUserGetPermissionBoundaryCommand(state *cli.State) *cobra.Comma
 		Short: "Get a user's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -1899,7 +1899,7 @@ func newWorkspaceUserListGroupsCommand(state *cli.State) *cobra.Command {
 		Short: "List user groups",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/groups")
 			if err != nil {
 				return err
 			}
@@ -1925,7 +1925,7 @@ func newWorkspaceUserListInlinePoliciesCommand(state *cli.State) *cobra.Command 
 		Short: "List a user's inline policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/inline-policies")
 			if err != nil {
 				return err
 			}
@@ -1951,7 +1951,7 @@ func newWorkspaceUserListPoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List user policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1976,7 +1976,7 @@ func newWorkspaceUserRemoveCommand(state *cli.State) *cobra.Command {
 		Short: "Remove user from organization",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}")
 			if err != nil {
 				return err
 			}
@@ -1999,7 +1999,7 @@ func newWorkspaceUserRemoveGroupCommand(state *cli.State) *cobra.Command {
 		Short: "Remove user from group",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/groups/{group_id}")
 			if err != nil {
 				return err
 			}
@@ -2022,7 +2022,7 @@ func newWorkspaceUserRemovePermissionBoundaryCommand(state *cli.State) *cobra.Co
 		Short: "Remove a user's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -2048,7 +2048,7 @@ func newWorkspaceUserSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Create or replace a user's inline policy",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -2086,7 +2086,7 @@ func newWorkspaceUserSetPermissionBoundaryCommand(state *cli.State) *cobra.Comma
 		Short: "Set a user's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := workspaceClient(state)
+			c, err := workspaceClient(state, "/v1/users/{user_id}/permission-boundary")
 			if err != nil {
 				return err
 			}

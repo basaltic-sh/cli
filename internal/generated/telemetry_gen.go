@@ -38,8 +38,8 @@ func newTelemetryCommand(state *cli.State) *cobra.Command {
 }
 
 // telemetryClient builds the service client, resolving credentials on first use.
-func telemetryClient(state *cli.State) (*telemetry.Client, error) {
-	cfg, err := state.SDK()
+func telemetryClient(state *cli.State, path string) (*telemetry.Client, error) {
+	cfg, err := state.ServiceSDK("telemetry", path)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func newTelemetryLogListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Search log records.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/logs")
 			if err != nil {
 				return err
 			}
@@ -124,7 +124,7 @@ func newTelemetryLogGetCommand(state *cli.State) *cobra.Command {
 		Short: "Get a single log record by id",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/logs/{log_id}")
 			if err != nil {
 				return err
 			}
@@ -150,7 +150,7 @@ func newTelemetryLogIngestCommand(state *cli.State) *cobra.Command {
 		Short: "Ingest a batch of log records",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/logs")
 			if err != nil {
 				return err
 			}
@@ -204,7 +204,7 @@ func newTelemetryLogGroupListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List log groups (or look up one by name).\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/log-groups")
 			if err != nil {
 				return err
 			}
@@ -237,7 +237,7 @@ func newTelemetryLogGroupGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get a log group by id.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/log-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -268,7 +268,7 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a log group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/log-groups")
 			if err != nil {
 				return err
 			}
@@ -329,7 +329,7 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update a log group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/log-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -380,7 +380,7 @@ func newTelemetryLogGroupDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a log group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/log-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -423,7 +423,7 @@ func newTelemetryMetricListNamesCommand(state *cli.State) *cobra.Command {
 		Short: "List the distinct metric names emitted in a time window",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/names")
 			if err != nil {
 				return err
 			}
@@ -451,7 +451,7 @@ func newTelemetryMetricListNamesBodyCommand(state *cli.State) *cobra.Command {
 		Short: "List the distinct metric names emitted in a time window (form body)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/names")
 			if err != nil {
 				return err
 			}
@@ -481,7 +481,7 @@ func newTelemetryMetricListSeriesCommand(state *cli.State) *cobra.Command {
 		Short: "List distinct label sets for a metric",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/series")
 			if err != nil {
 				return err
 			}
@@ -511,7 +511,7 @@ func newTelemetryMetricListSeriesBodyCommand(state *cli.State) *cobra.Command {
 		Short: "List distinct label sets for a metric (form body)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/series")
 			if err != nil {
 				return err
 			}
@@ -541,7 +541,7 @@ func newTelemetryMetricQueryCommand(state *cli.State) *cobra.Command {
 		Short: "Instant structured metric query",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/query")
 			if err != nil {
 				return err
 			}
@@ -573,7 +573,7 @@ func newTelemetryMetricQueryBodyCommand(state *cli.State) *cobra.Command {
 		Short: "Instant structured metric query (form body)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/query")
 			if err != nil {
 				return err
 			}
@@ -603,7 +603,7 @@ func newTelemetryMetricQueryRangeCommand(state *cli.State) *cobra.Command {
 		Short: "Range structured metric query",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/query_range")
 			if err != nil {
 				return err
 			}
@@ -638,7 +638,7 @@ func newTelemetryMetricQueryRangeBodyCommand(state *cli.State) *cobra.Command {
 		Short: "Range structured metric query (form body)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/query_range")
 			if err != nil {
 				return err
 			}
@@ -668,7 +668,7 @@ func newTelemetryMetricWriteCommand(state *cli.State) *cobra.Command {
 		Short: "Prometheus remote_write ingest",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/metrics/write")
 			if err != nil {
 				return err
 			}
@@ -711,7 +711,7 @@ func newTelemetrySpanIngestCommand(state *cli.State) *cobra.Command {
 		Short: "Ingest a batch of trace spans",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/spans")
 			if err != nil {
 				return err
 			}
@@ -764,7 +764,7 @@ func newTelemetryTraceListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List traces.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/traces")
 			if err != nil {
 				return err
 			}
@@ -815,7 +815,7 @@ func newTelemetryTraceGetCommand(state *cli.State) *cobra.Command {
 		Short: "Get all spans for a trace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/traces/{trace_id}")
 			if err != nil {
 				return err
 			}
@@ -852,7 +852,7 @@ func newTelemetryTraceSettingsGetCommand(state *cli.State) *cobra.Command {
 		Short: "Get the caller account's trace settings",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/trace-settings")
 			if err != nil {
 				return err
 			}
@@ -875,7 +875,7 @@ func newTelemetryTraceSettingsDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete trace settings",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/trace-settings")
 			if err != nil {
 				return err
 			}
@@ -898,7 +898,7 @@ func newTelemetryTraceSettingsGetRetainedDataCommand(state *cli.State) *cobra.Co
 		Short: "Check retained telemetry presence",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/trace-settings/retained-data")
 			if err != nil {
 				return err
 			}
@@ -926,7 +926,7 @@ func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
 		Short: "Update the caller account's trace settings",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state)
+			c, err := telemetryClient(state, "/v1/trace-settings")
 			if err != nil {
 				return err
 			}

@@ -39,8 +39,8 @@ func newStorageCommand(state *cli.State) *cobra.Command {
 }
 
 // storageClient builds the service client, resolving credentials on first use.
-func storageClient(state *cli.State) (*storage.Client, error) {
-	cfg, err := state.SDK()
+func storageClient(state *cli.State, path string) (*storage.Client, error) {
+	cfg, err := state.ServiceSDK("storage", path)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func newStorageBucketListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List buckets.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets")
 			if err != nil {
 				return err
 			}
@@ -130,7 +130,7 @@ func newStorageBucketCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create bucket.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets")
 			if err != nil {
 				return err
 			}
@@ -170,7 +170,7 @@ func newStorageBucketDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}")
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ func newStorageBucketDeleteCorsCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket CORS configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/cors")
 			if err != nil {
 				return err
 			}
@@ -216,7 +216,7 @@ func newStorageBucketDeleteEncryptionCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket encryption configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/encryption")
 			if err != nil {
 				return err
 			}
@@ -240,7 +240,7 @@ func newStorageBucketDeleteLifecycleCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket lifecycle configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/lifecycle")
 			if err != nil {
 				return err
 			}
@@ -268,7 +268,7 @@ func newStorageBucketDeleteObjectLockCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket object-lock configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/object-lock")
 			if err != nil {
 				return err
 			}
@@ -291,7 +291,7 @@ func newStorageBucketDeletePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/policy")
 			if err != nil {
 				return err
 			}
@@ -314,7 +314,7 @@ func newStorageBucketDeleteTaggingCommand(state *cli.State) *cobra.Command {
 		Short: "Delete bucket tag set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/tagging")
 			if err != nil {
 				return err
 			}
@@ -337,7 +337,7 @@ func newStorageBucketGetCorsCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket CORS configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/cors")
 			if err != nil {
 				return err
 			}
@@ -360,7 +360,7 @@ func newStorageBucketGetEncryptionCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket encryption configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/encryption")
 			if err != nil {
 				return err
 			}
@@ -383,7 +383,7 @@ func newStorageBucketGetLifecycleCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket lifecycle configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/lifecycle")
 			if err != nil {
 				return err
 			}
@@ -406,7 +406,7 @@ func newStorageBucketGetObjectLockCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket object-lock configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/object-lock")
 			if err != nil {
 				return err
 			}
@@ -429,7 +429,7 @@ func newStorageBucketGetPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/policy")
 			if err != nil {
 				return err
 			}
@@ -452,7 +452,7 @@ func newStorageBucketGetTaggingCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket tag set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/tagging")
 			if err != nil {
 				return err
 			}
@@ -475,7 +475,7 @@ func newStorageBucketGetVersioningCommand(state *cli.State) *cobra.Command {
 		Short: "Get bucket versioning state",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/versioning")
 			if err != nil {
 				return err
 			}
@@ -498,7 +498,7 @@ func newStorageBucketHeadCommand(state *cli.State) *cobra.Command {
 		Short: "Head bucket",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}")
 			if err != nil {
 				return err
 			}
@@ -522,7 +522,7 @@ func newStorageBucketListObjectVersionsCommand(state *cli.State) *cobra.Command 
 		Short: "List object versions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/object-versions")
 			if err != nil {
 				return err
 			}
@@ -551,7 +551,7 @@ func newStorageBucketRestoreCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Restore a bucket pending deletion.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/restore")
 			if err != nil {
 				return err
 			}
@@ -582,7 +582,7 @@ func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket CORS configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/cors")
 			if err != nil {
 				return err
 			}
@@ -621,7 +621,7 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 		Short: "Set bucket deletion protection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/deletion-protection")
 			if err != nil {
 				return err
 			}
@@ -659,7 +659,7 @@ func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket encryption configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/encryption")
 			if err != nil {
 				return err
 			}
@@ -699,7 +699,7 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket lifecycle configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/lifecycle")
 			if err != nil {
 				return err
 			}
@@ -743,7 +743,7 @@ func newStorageBucketSetObjectLockCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket object-lock configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/object-lock")
 			if err != nil {
 				return err
 			}
@@ -782,7 +782,7 @@ func newStorageBucketSetPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/policy")
 			if err != nil {
 				return err
 			}
@@ -821,7 +821,7 @@ func newStorageBucketSetTaggingCommand(state *cli.State) *cobra.Command {
 		Short: "Put bucket tag set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/tagging")
 			if err != nil {
 				return err
 			}
@@ -859,7 +859,7 @@ func newStorageBucketSetVersioningCommand(state *cli.State) *cobra.Command {
 		Short: "Set bucket versioning state",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/versioning")
 			if err != nil {
 				return err
 			}
@@ -907,7 +907,7 @@ func newStorageMultipartUploadListCommand(state *cli.State) *cobra.Command {
 		Short: "List in-flight multipart uploads",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads")
 			if err != nil {
 				return err
 			}
@@ -932,7 +932,7 @@ func newStorageMultipartUploadAbortCommand(state *cli.State) *cobra.Command {
 		Short: "Abort a multipart upload",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads/{upload_id}")
 			if err != nil {
 				return err
 			}
@@ -960,7 +960,7 @@ func newStorageMultipartUploadCompleteCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Complete a multipart upload.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads/{upload_id}/complete")
 			if err != nil {
 				return err
 			}
@@ -1008,7 +1008,7 @@ func newStorageMultipartUploadInitiateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Initiate a multipart upload.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads")
 			if err != nil {
 				return err
 			}
@@ -1058,7 +1058,7 @@ func newStorageMultipartUploadListPartsCommand(state *cli.State) *cobra.Command 
 		Short: "List uploaded parts",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads/{upload_id}/parts")
 			if err != nil {
 				return err
 			}
@@ -1082,7 +1082,7 @@ func newStorageMultipartUploadUploadPartCommand(state *cli.State) *cobra.Command
 		Short: "Upload a part",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads/{upload_id}/parts/{part_number}")
 			if err != nil {
 				return err
 			}
@@ -1127,7 +1127,7 @@ func newStorageObjectListCommand(state *cli.State) *cobra.Command {
 		Short: "List objects",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/objects")
 			if err != nil {
 				return err
 			}
@@ -1154,7 +1154,7 @@ func newStorageObjectGetCommand(state *cli.State) *cobra.Command {
 		Short: "Download object",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/objects/{key}")
 			if err != nil {
 				return err
 			}
@@ -1177,7 +1177,7 @@ func newStorageObjectDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete object",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/objects/{key}")
 			if err != nil {
 				return err
 			}
@@ -1200,7 +1200,7 @@ func newStorageObjectHeadCommand(state *cli.State) *cobra.Command {
 		Short: "Head object",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/objects/{key}")
 			if err != nil {
 				return err
 			}
@@ -1224,7 +1224,7 @@ func newStorageObjectPutCommand(state *cli.State) *cobra.Command {
 		Short: "Upload object",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/buckets/{bucket}/objects/{key}")
 			if err != nil {
 				return err
 			}
@@ -1271,7 +1271,7 @@ func newStorageSnapshotListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List snapshots.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshots")
 			if err != nil {
 				return err
 			}
@@ -1307,7 +1307,7 @@ func newStorageSnapshotGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get snapshot.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --snapshot-policy or --volume with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshots/{snapshot_id}")
 			if err != nil {
 				return err
 			}
@@ -1338,7 +1338,7 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create snapshot.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshots")
 			if err != nil {
 				return err
 			}
@@ -1390,7 +1390,7 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update snapshot metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshots/{snapshot_id}")
 			if err != nil {
 				return err
 			}
@@ -1429,7 +1429,7 @@ func newStorageSnapshotDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete snapshot",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshots/{snapshot_id}")
 			if err != nil {
 				return err
 			}
@@ -1471,7 +1471,7 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List snapshot policies.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshot-policies")
 			if err != nil {
 				return err
 			}
@@ -1509,7 +1509,7 @@ func newStorageSnapshotPolicyGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get snapshot policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --volume with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1541,7 +1541,7 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create snapshot policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshot-policies")
 			if err != nil {
 				return err
 			}
@@ -1609,7 +1609,7 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update snapshot policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1664,7 +1664,7 @@ func newStorageSnapshotPolicyDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete snapshot policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1706,7 +1706,7 @@ func newStorageVolumeListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List volumes.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes")
 			if err != nil {
 				return err
 			}
@@ -1740,7 +1740,7 @@ func newStorageVolumeGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get volume.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes/{volume_id}")
 			if err != nil {
 				return err
 			}
@@ -1773,7 +1773,7 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create volume.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes")
 			if err != nil {
 				return err
 			}
@@ -1843,7 +1843,7 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update volume metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes/{volume_id}")
 			if err != nil {
 				return err
 			}
@@ -1882,7 +1882,7 @@ func newStorageVolumeDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete volume",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes/{volume_id}")
 			if err != nil {
 				return err
 			}
@@ -1909,7 +1909,7 @@ func newStorageVolumeExtendCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Extend volume.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/extend")
 			if err != nil {
 				return err
 			}
@@ -1957,7 +1957,7 @@ func newStorageVolumeTypeListCommand(state *cli.State) *cobra.Command {
 		Short: "List volume types",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state)
+			c, err := storageClient(state, "/v1/volume-types")
 			if err != nil {
 				return err
 			}

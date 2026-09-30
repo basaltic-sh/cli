@@ -36,8 +36,8 @@ func newLoadbalancerCommand(state *cli.State) *cobra.Command {
 }
 
 // loadbalancerClient builds the service client, resolving credentials on first use.
-func loadbalancerClient(state *cli.State) (*loadbalancer.Client, error) {
-	cfg, err := state.SDK()
+func loadbalancerClient(state *cli.State, path string) (*loadbalancer.Client, error) {
+	cfg, err := state.ServiceSDK("loadbalancer", path)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func newLoadbalancerListenerListCommand(state *cli.State) *cobra.Command {
 		Short: "List this load balancer's listeners",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners")
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func newLoadbalancerListenerGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Get a listener.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}")
 			if err != nil {
 				return err
 			}
@@ -127,7 +127,7 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create a listener on this load balancer.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners")
 			if err != nil {
 				return err
 			}
@@ -192,7 +192,7 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Patch a listener (rotate cert, change default target group)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}")
 			if err != nil {
 				return err
 			}
@@ -243,7 +243,7 @@ func newLoadbalancerListenerDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a listener",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}")
 			if err != nil {
 				return err
 			}
@@ -271,7 +271,7 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 		Args:  cobra.ExactArgs(2),
 		Long:  "Attach an additional certificate to an HTTPS listener.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/certificates")
 			if err != nil {
 				return err
 			}
@@ -311,7 +311,7 @@ func newLoadbalancerListenerDetachCertificateCommand(state *cli.State) *cobra.Co
 		Short: "Detach a certificate from an HTTPS listener",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/certificates/{certificate_id}")
 			if err != nil {
 				return err
 			}
@@ -353,7 +353,7 @@ func newLoadbalancerLoadBalancerListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List load balancers.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers")
 			if err != nil {
 				return err
 			}
@@ -387,7 +387,7 @@ func newLoadbalancerLoadBalancerGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get a load balancer.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}")
 			if err != nil {
 				return err
 			}
@@ -417,7 +417,7 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a load balancer.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers")
 			if err != nil {
 				return err
 			}
@@ -484,7 +484,7 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Scale or resize a load balancer",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}")
 			if err != nil {
 				return err
 			}
@@ -527,7 +527,7 @@ func newLoadbalancerLoadBalancerDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a load balancer",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}")
 			if err != nil {
 				return err
 			}
@@ -551,7 +551,7 @@ func newLoadbalancerLoadBalancerListReplicasCommand(state *cli.State) *cobra.Com
 		Short: "List the LB's instance replicas with live health",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/replicas")
 			if err != nil {
 				return err
 			}
@@ -592,7 +592,7 @@ func newLoadbalancerRuleListCommand(state *cli.State) *cobra.Command {
 		Short: "List this listener's rules",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules")
 			if err != nil {
 				return err
 			}
@@ -619,7 +619,7 @@ func newLoadbalancerRuleGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(3),
 		Long:  "Get a routing rule.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules/{rule_id}")
 			if err != nil {
 				return err
 			}
@@ -647,7 +647,7 @@ func newLoadbalancerRuleCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Create a routing rule on this listener (HTTP/HTTPS only).\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules")
 			if err != nil {
 				return err
 			}
@@ -695,7 +695,7 @@ func newLoadbalancerRuleUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update a routing rule (full replace)",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules/{rule_id}")
 			if err != nil {
 				return err
 			}
@@ -735,7 +735,7 @@ func newLoadbalancerRuleDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a routing rule",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules/{rule_id}")
 			if err != nil {
 				return err
 			}
@@ -780,7 +780,7 @@ func newLoadbalancerTargetGroupListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List target groups.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups")
 			if err != nil {
 				return err
 			}
@@ -814,7 +814,7 @@ func newLoadbalancerTargetGroupGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get a target group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -848,7 +848,7 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a target group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups")
 			if err != nil {
 				return err
 			}
@@ -928,7 +928,7 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update target group health checks, framing, or stickiness",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -979,7 +979,7 @@ func newLoadbalancerTargetGroupDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a target group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}")
 			if err != nil {
 				return err
 			}
@@ -1007,7 +1007,7 @@ func newLoadbalancerTargetGroupAttachTargetCommand(state *cli.State) *cobra.Comm
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a target to this group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}/targets")
 			if err != nil {
 				return err
 			}
@@ -1047,7 +1047,7 @@ func newLoadbalancerTargetGroupDetachTargetCommand(state *cli.State) *cobra.Comm
 		Short: "Detach a target",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}/targets/{target_id}")
 			if err != nil {
 				return err
 			}
@@ -1070,7 +1070,7 @@ func newLoadbalancerTargetGroupGetTargetCommand(state *cli.State) *cobra.Command
 		Short: "Get a target",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}/targets/{target_id}")
 			if err != nil {
 				return err
 			}
@@ -1094,7 +1094,7 @@ func newLoadbalancerTargetGroupListTargetsCommand(state *cli.State) *cobra.Comma
 		Short: "List targets in this group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := loadbalancerClient(state)
+			c, err := loadbalancerClient(state, "/v1/target-groups/{id}/targets")
 			if err != nil {
 				return err
 			}

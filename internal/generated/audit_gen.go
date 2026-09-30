@@ -29,8 +29,8 @@ func newAuditCommand(state *cli.State) *cobra.Command {
 }
 
 // auditClient builds the service client, resolving credentials on first use.
-func auditClient(state *cli.State) (*audit.Client, error) {
-	cfg, err := state.SDK()
+func auditClient(state *cli.State, path string) (*audit.Client, error) {
+	cfg, err := state.ServiceSDK("audit", path)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func newAuditLogListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List audit logs.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := auditClient(state)
+			c, err := auditClient(state, "/v1/audit-logs")
 			if err != nil {
 				return err
 			}
@@ -116,7 +116,7 @@ func newAuditLogGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get audit log entry.\n\n<ref> is its id or its CRN. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nThis resource has no name.\n\nA name is unique only within its parent: pass --actor or --resource with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := auditClient(state)
+			c, err := auditClient(state, "/v1/audit-logs/{log_id}")
 			if err != nil {
 				return err
 			}

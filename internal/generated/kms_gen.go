@@ -32,8 +32,8 @@ func newKmsCommand(state *cli.State) *cobra.Command {
 }
 
 // kmsClient builds the service client, resolving credentials on first use.
-func kmsClient(state *cli.State) (*kms.Client, error) {
-	cfg, err := state.SDK()
+func kmsClient(state *cli.State, path string) (*kms.Client, error) {
+	cfg, err := state.ServiceSDK("kms", path)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func newKmsKeyListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List KMS keys.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys")
 			if err != nil {
 				return err
 			}
@@ -107,7 +107,7 @@ func newKmsKeyGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get a KMS key.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}")
 			if err != nil {
 				return err
 			}
@@ -137,7 +137,7 @@ func newKmsKeyCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a KMS key.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys")
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update key metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}")
 			if err != nil {
 				return err
 			}
@@ -232,7 +232,7 @@ func newKmsKeyCancelDeletionCommand(state *cli.State) *cobra.Command {
 		Short: "Cancel a scheduled deletion",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/cancel-deletion")
 			if err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func newKmsKeyDecryptCommand(state *cli.State) *cobra.Command {
 		Short: "Decrypt a ciphertext",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/decrypt")
 			if err != nil {
 				return err
 			}
@@ -297,7 +297,7 @@ func newKmsKeyDisableCommand(state *cli.State) *cobra.Command {
 		Short: "Disable a key",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/disable")
 			if err != nil {
 				return err
 			}
@@ -320,7 +320,7 @@ func newKmsKeyEnableCommand(state *cli.State) *cobra.Command {
 		Short: "Enable a disabled key",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/enable")
 			if err != nil {
 				return err
 			}
@@ -347,7 +347,7 @@ func newKmsKeyEncryptCommand(state *cli.State) *cobra.Command {
 		Short: "Encrypt a payload",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/encrypt")
 			if err != nil {
 				return err
 			}
@@ -388,7 +388,7 @@ func newKmsKeyGenerateDataKeyCommand(state *cli.State) *cobra.Command {
 		Short: "Generate a fresh data key",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/generate-data-key")
 			if err != nil {
 				return err
 			}
@@ -424,7 +424,7 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 		Short: "Schedule key for deletion",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/schedule-deletion")
 			if err != nil {
 				return err
 			}
@@ -461,7 +461,7 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 		Short: "Sign a message",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/sign")
 			if err != nil {
 				return err
 			}
@@ -504,7 +504,7 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 		Short: "Verify a signature",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := kmsClient(state)
+			c, err := kmsClient(state, "/v1/keys/{key_id}/verify")
 			if err != nil {
 				return err
 			}

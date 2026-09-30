@@ -43,8 +43,8 @@ func newNetworkCommand(state *cli.State) *cobra.Command {
 }
 
 // networkClient builds the service client, resolving credentials on first use.
-func networkClient(state *cli.State) (*network.Client, error) {
-	cfg, err := state.SDK()
+func networkClient(state *cli.State, path string) (*network.Client, error) {
+	cfg, err := state.ServiceSDK("network", path)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func newNetworkEgressOnlyGatewayListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List egress-only gateways.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways")
 			if err != nil {
 				return err
 			}
@@ -110,7 +110,7 @@ func newNetworkEgressOnlyGatewayGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get egress-only gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways/{egress_only_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -139,7 +139,7 @@ func newNetworkEgressOnlyGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create egress-only gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways")
 			if err != nil {
 				return err
 			}
@@ -191,7 +191,7 @@ func newNetworkEgressOnlyGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update egress-only gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways/{egress_only_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -230,7 +230,7 @@ func newNetworkEgressOnlyGatewayDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete egress-only gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways/{egress_only_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -256,7 +256,7 @@ func newNetworkEgressOnlyGatewayListRoutesCommand(state *cli.State) *cobra.Comma
 		Args:  cobra.ExactArgs(1),
 		Long:  "List egress-only gateway routes.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/egress-only-gateways/{egress_only_gateway_id}/routes")
 			if err != nil {
 				return err
 			}
@@ -307,7 +307,7 @@ func newNetworkFloatingIpListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List floating IPs.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips")
 			if err != nil {
 				return err
 			}
@@ -341,7 +341,7 @@ func newNetworkFloatingIpGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get floating IP.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --attached-to with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}")
 			if err != nil {
 				return err
 			}
@@ -375,7 +375,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Allocate floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips")
 			if err != nil {
 				return err
 			}
@@ -442,7 +442,7 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update floating IP",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}")
 			if err != nil {
 				return err
 			}
@@ -487,7 +487,7 @@ func newNetworkFloatingIpDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Release floating IP",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}")
 			if err != nil {
 				return err
 			}
@@ -514,7 +514,7 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a floating IP to an interface.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/attach")
 			if err != nil {
 				return err
 			}
@@ -557,7 +557,7 @@ func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Detach a floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/detach")
 			if err != nil {
 				return err
 			}
@@ -622,7 +622,7 @@ func newNetworkInterfaceListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List interfaces.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces")
 			if err != nil {
 				return err
 			}
@@ -657,7 +657,7 @@ func newNetworkInterfaceGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get interface.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --subnet or --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}")
 			if err != nil {
 				return err
 			}
@@ -690,7 +690,7 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create interface.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces")
 			if err != nil {
 				return err
 			}
@@ -752,7 +752,7 @@ func newNetworkInterfaceUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update interface",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}")
 			if err != nil {
 				return err
 			}
@@ -791,7 +791,7 @@ func newNetworkInterfaceDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete interface",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}")
 			if err != nil {
 				return err
 			}
@@ -817,7 +817,7 @@ func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 		Short: "Create interface address",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/addresses")
 			if err != nil {
 				return err
 			}
@@ -854,7 +854,7 @@ func newNetworkInterfaceCreatePrefixCommand(state *cli.State) *cobra.Command {
 		Short: "Create interface prefix",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/prefixes")
 			if err != nil {
 				return err
 			}
@@ -885,7 +885,7 @@ func newNetworkInterfaceDeleteAddressCommand(state *cli.State) *cobra.Command {
 		Short: "Delete interface address",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/addresses/{address_id}")
 			if err != nil {
 				return err
 			}
@@ -908,7 +908,7 @@ func newNetworkInterfaceDeletePrefixCommand(state *cli.State) *cobra.Command {
 		Short: "Delete interface prefix",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/prefixes/{prefix_id}")
 			if err != nil {
 				return err
 			}
@@ -931,7 +931,7 @@ func newNetworkInterfaceGetAddressCommand(state *cli.State) *cobra.Command {
 		Short: "Get interface address",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/addresses/{address_id}")
 			if err != nil {
 				return err
 			}
@@ -954,7 +954,7 @@ func newNetworkInterfaceListAddressesCommand(state *cli.State) *cobra.Command {
 		Short: "List interface addresses",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/addresses")
 			if err != nil {
 				return err
 			}
@@ -977,7 +977,7 @@ func newNetworkInterfaceListPrefixesCommand(state *cli.State) *cobra.Command {
 		Short: "List interface prefixes",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/prefixes")
 			if err != nil {
 				return err
 			}
@@ -1001,7 +1001,7 @@ func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Comma
 		Short: "List interface security-group membership",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
 			if err != nil {
 				return err
 			}
@@ -1028,7 +1028,7 @@ func newNetworkInterfaceSetSecurityGroupCommand(state *cli.State) *cobra.Command
 		Short: "Set interface security-group membership",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
 			if err != nil {
 				return err
 			}
@@ -1080,7 +1080,7 @@ func newNetworkInternetGatewayListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List internet gateways.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways")
 			if err != nil {
 				return err
 			}
@@ -1113,7 +1113,7 @@ func newNetworkInternetGatewayGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get internet gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1142,7 +1142,7 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create internet gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways")
 			if err != nil {
 				return err
 			}
@@ -1192,7 +1192,7 @@ func newNetworkInternetGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update internet gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1231,7 +1231,7 @@ func newNetworkInternetGatewayDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete internet gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1258,7 +1258,7 @@ func newNetworkInternetGatewayAttachCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach internet gateway to a VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/attach")
 			if err != nil {
 				return err
 			}
@@ -1296,7 +1296,7 @@ func newNetworkInternetGatewayDetachCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Detach internet gateway from its VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/detach")
 			if err != nil {
 				return err
 			}
@@ -1327,7 +1327,7 @@ func newNetworkInternetGatewayListRoutesCommand(state *cli.State) *cobra.Command
 		Args:  cobra.ExactArgs(1),
 		Long:  "List internet gateway routes.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/routes")
 			if err != nil {
 				return err
 			}
@@ -1377,7 +1377,7 @@ func newNetworkNatGatewayListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List NAT gateways.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways")
 			if err != nil {
 				return err
 			}
@@ -1412,7 +1412,7 @@ func newNetworkNatGatewayGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get NAT gateway.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --subnet or --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways/{nat_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1443,7 +1443,7 @@ func newNetworkNatGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create NAT gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways")
 			if err != nil {
 				return err
 			}
@@ -1495,7 +1495,7 @@ func newNetworkNatGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update NAT gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways/{nat_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1534,7 +1534,7 @@ func newNetworkNatGatewayDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete NAT gateway",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways/{nat_gateway_id}")
 			if err != nil {
 				return err
 			}
@@ -1560,7 +1560,7 @@ func newNetworkNatGatewayListRoutesCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List NAT gateway routes.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/nat-gateways/{nat_gateway_id}/routes")
 			if err != nil {
 				return err
 			}
@@ -1609,7 +1609,7 @@ func newNetworkRouteListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List routes.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes")
 			if err != nil {
 				return err
 			}
@@ -1642,7 +1642,7 @@ func newNetworkRouteGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Get route.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes/{route_id}")
 			if err != nil {
 				return err
 			}
@@ -1675,7 +1675,7 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create route.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes")
 			if err != nil {
 				return err
 			}
@@ -1741,7 +1741,7 @@ func newNetworkRouteUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update route",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes/{route_id}")
 			if err != nil {
 				return err
 			}
@@ -1780,7 +1780,7 @@ func newNetworkRouteDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete route",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes/{route_id}")
 			if err != nil {
 				return err
 			}
@@ -1821,7 +1821,7 @@ func newNetworkRouteTableListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List route tables.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables")
 			if err != nil {
 				return err
 			}
@@ -1855,7 +1855,7 @@ func newNetworkRouteTableGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get route table.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}")
 			if err != nil {
 				return err
 			}
@@ -1885,7 +1885,7 @@ func newNetworkRouteTableCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create route table.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables")
 			if err != nil {
 				return err
 			}
@@ -1937,7 +1937,7 @@ func newNetworkRouteTableUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update route table",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}")
 			if err != nil {
 				return err
 			}
@@ -1976,7 +1976,7 @@ func newNetworkRouteTableDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete route table",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/route-tables/{route_table_id}")
 			if err != nil {
 				return err
 			}
@@ -2017,7 +2017,7 @@ func newNetworkSecurityGroupListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List security groups.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups")
 			if err != nil {
 				return err
 			}
@@ -2050,7 +2050,7 @@ func newNetworkSecurityGroupGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get security group.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}")
 			if err != nil {
 				return err
 			}
@@ -2079,7 +2079,7 @@ func newNetworkSecurityGroupCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create security group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups")
 			if err != nil {
 				return err
 			}
@@ -2129,7 +2129,7 @@ func newNetworkSecurityGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update security group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}")
 			if err != nil {
 				return err
 			}
@@ -2168,7 +2168,7 @@ func newNetworkSecurityGroupDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete security group",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}")
 			if err != nil {
 				return err
 			}
@@ -2208,7 +2208,7 @@ func newNetworkSecurityGroupRuleListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List security group rules.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}/rules")
 			if err != nil {
 				return err
 			}
@@ -2241,7 +2241,7 @@ func newNetworkSecurityGroupRuleGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Get security group rule.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}/rules/{rule_id}")
 			if err != nil {
 				return err
 			}
@@ -2274,7 +2274,7 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create security group rule.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}/rules")
 			if err != nil {
 				return err
 			}
@@ -2336,7 +2336,7 @@ func newNetworkSecurityGroupRuleDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete security group rule",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/security-groups/{security_group_id}/rules/{rule_id}")
 			if err != nil {
 				return err
 			}
@@ -2377,7 +2377,7 @@ func newNetworkSubnetListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List subnets.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/subnets")
 			if err != nil {
 				return err
 			}
@@ -2411,7 +2411,7 @@ func newNetworkSubnetGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get subnet.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --vpc with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/subnets/{subnet_id}")
 			if err != nil {
 				return err
 			}
@@ -2445,7 +2445,7 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create subnet.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/subnets")
 			if err != nil {
 				return err
 			}
@@ -2520,7 +2520,7 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update subnet",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/subnets/{subnet_id}")
 			if err != nil {
 				return err
 			}
@@ -2579,7 +2579,7 @@ func newNetworkSubnetDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete subnet",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/subnets/{subnet_id}")
 			if err != nil {
 				return err
 			}
@@ -2623,7 +2623,7 @@ func newNetworkVpcListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List VPCs.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs")
 			if err != nil {
 				return err
 			}
@@ -2656,7 +2656,7 @@ func newNetworkVpcGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get VPC.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}")
 			if err != nil {
 				return err
 			}
@@ -2687,7 +2687,7 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs")
 			if err != nil {
 				return err
 			}
@@ -2749,7 +2749,7 @@ func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update VPC",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}")
 			if err != nil {
 				return err
 			}
@@ -2796,7 +2796,7 @@ func newNetworkVpcDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete VPC",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}")
 			if err != nil {
 				return err
 			}
@@ -2821,7 +2821,7 @@ func newNetworkVpcCreatePrefixPoolCommand(state *cli.State) *cobra.Command {
 		Short: "Create prefix pool",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
 			if err != nil {
 				return err
 			}
@@ -2852,7 +2852,7 @@ func newNetworkVpcDeletePrefixPoolCommand(state *cli.State) *cobra.Command {
 		Short: "Delete prefix pool",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools/{pool_id}")
 			if err != nil {
 				return err
 			}
@@ -2875,7 +2875,7 @@ func newNetworkVpcListPrefixPoolsCommand(state *cli.State) *cobra.Command {
 		Short: "List prefix pools",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state)
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
 			if err != nil {
 				return err
 			}

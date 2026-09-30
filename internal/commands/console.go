@@ -62,7 +62,7 @@ func runSerialConsole(ctx context.Context, state *cli.State, instanceID string, 
 	if strings.TrimSpace(instanceID) == "" {
 		return errors.New("instance_id must not be empty")
 	}
-	cfg, err := state.SDK()
+	cfg, err := state.ServiceSDK("compute", "/v1/instances")
 	if err != nil {
 		return err
 	}

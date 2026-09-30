@@ -40,8 +40,8 @@ func newSecretsCommand(state *cli.State) *cobra.Command {
 }
 
 // secretsClient builds the service client, resolving credentials on first use.
-func secretsClient(state *cli.State) (*secrets.Client, error) {
-	cfg, err := state.SDK()
+func secretsClient(state *cli.State, path string) (*secrets.Client, error) {
+	cfg, err := state.ServiceSDK("secrets", path)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func newSecretsSecretListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List secrets.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets")
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func newSecretsSecretGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Describe a secret (no value).\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}")
 			if err != nil {
 				return err
 			}
@@ -128,7 +128,7 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a new secret with an initial value.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets")
 			if err != nil {
 				return err
 			}
@@ -191,7 +191,7 @@ func newSecretsSecretUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update mutable metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}")
 			if err != nil {
 				return err
 			}
@@ -233,7 +233,7 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Schedule deletion (soft delete with recovery window)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}")
 			if err != nil {
 				return err
 			}
@@ -267,7 +267,7 @@ func newSecretsSecretGetValueCommand(state *cli.State) *cobra.Command {
 		Short: "Read the current value (or a specific version)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}/value")
 			if err != nil {
 				return err
 			}
@@ -294,7 +294,7 @@ func newSecretsSecretListVersionsCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List versions.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}/versions")
 			if err != nil {
 				return err
 			}
@@ -326,7 +326,7 @@ func newSecretsSecretRestoreCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Restore a secret from the recovery window.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}/restore")
 			if err != nil {
 				return err
 			}
@@ -359,7 +359,7 @@ func newSecretsSecretSetValueCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Store a new version (becomes current).\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := secretsClient(state)
+			c, err := secretsClient(state, "/v1/secrets/{secret_id}/value")
 			if err != nil {
 				return err
 			}

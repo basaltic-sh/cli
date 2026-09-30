@@ -27,7 +27,7 @@ func newCatalogCommand(state *cli.State) *cobra.Command {
 }
 
 // catalogClient builds the public service client without credentials.
-func catalogClient(state *cli.State) (*catalog.Client, error) {
+func catalogClient(state *cli.State, path string) (*catalog.Client, error) {
 	cfg, err := state.PublicSDK()
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func newCatalogRegionListCommand(state *cli.State) *cobra.Command {
 		Short: "List regions",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := catalogClient(state)
+			c, err := catalogClient(state, "/v1/regions")
 			if err != nil {
 				return err
 			}
@@ -80,7 +80,7 @@ func newCatalogRegionGetCommand(state *cli.State) *cobra.Command {
 		Short: "Get a region",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := catalogClient(state)
+			c, err := catalogClient(state, "/v1/regions/{code}")
 			if err != nil {
 				return err
 			}

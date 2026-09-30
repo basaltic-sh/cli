@@ -38,8 +38,8 @@ func newCertificateCommand(state *cli.State) *cobra.Command {
 }
 
 // certificateClient builds the service client, resolving credentials on first use.
-func certificateClient(state *cli.State) (*certificate.Client, error) {
-	cfg, err := state.SDK()
+func certificateClient(state *cli.State, path string) (*certificate.Client, error) {
+	cfg, err := state.ServiceSDK("certificate", path)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func newCertificateCertificateListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List certificates.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates")
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ func newCertificateCertificateGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get certificate.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates/{certificate_id}")
 			if err != nil {
 				return err
 			}
@@ -122,7 +122,7 @@ func newCertificateCertificateCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create certificate.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates")
 			if err != nil {
 				return err
 			}
@@ -186,7 +186,7 @@ func newCertificateCertificateDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete certificate",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates/{certificate_id}")
 			if err != nil {
 				return err
 			}
@@ -209,7 +209,7 @@ func newCertificateCertificateGetMaterialCommand(state *cli.State) *cobra.Comman
 		Short: "Fetch certificate material (leaf, chain, private key)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates/{certificate_id}/material")
 			if err != nil {
 				return err
 			}
@@ -234,7 +234,7 @@ func newCertificateCertificateRevokeCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Revoke certificate.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := certificateClient(state)
+			c, err := certificateClient(state, "/v1/certificates/{certificate_id}/revoke")
 			if err != nil {
 				return err
 			}

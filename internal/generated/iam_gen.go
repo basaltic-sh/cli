@@ -26,23 +26,59 @@ func newIamCommand(state *cli.State) *cobra.Command {
 		Use:   "iam",
 		Short: "Account roles, policies, service accounts and sessions",
 	}
+	cmd.AddCommand(newIamAuthCommand(state))
 	cmd.AddCommand(newIamOauthCommand(state))
 	cmd.AddCommand(newIamPolicyCommand(state))
 	cmd.AddCommand(newIamRegionCommand(state))
 	cmd.AddCommand(newIamRoleCommand(state))
 	cmd.AddCommand(newIamServiceAccountCommand(state))
+	cmd.AddCommand(newIamSshKeyCommand(state))
 	cmd.AddCommand(newIamStsSessionCommand(state))
 	cmd.AddCommand(newIamTokenCommand(state))
 	return cmd
 }
 
 // iamClient builds the service client, resolving credentials on first use.
-func iamClient(state *cli.State) (*iam.Client, error) {
-	cfg, err := state.SDK()
+func iamClient(state *cli.State, path string) (*iam.Client, error) {
+	cfg, err := state.ServiceSDK("iam", path)
 	if err != nil {
 		return nil, err
 	}
 	return iam.New(cfg), nil
+}
+
+// newIamAuthCommand builds `basaltic iam auth`.
+func newIamAuthCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "auth",
+		Short:   "Auths",
+		Aliases: []string{"auths"},
+	}
+	cmd.AddCommand(newIamAuthGetLinuxIdentityCommand(state))
+	return cmd
+}
+
+// newIamAuthGetLinuxIdentityCommand builds `basaltic iam auth get-linux-identity`.
+func newIamAuthGetLinuxIdentityCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-linux-identity",
+		Short: "Get personal Linux identity",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/auth/linux-identity")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetPersonalLinuxIdentity(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
 }
 
 // newIamOauthCommand builds `basaltic iam oauth`.
@@ -66,7 +102,7 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 		Short: "Approve a CLI login and issue an authorization code",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/oauth/authorize")
 			if err != nil {
 				return err
 			}
@@ -129,7 +165,7 @@ func newIamPolicyListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List policies.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies")
 			if err != nil {
 				return err
 			}
@@ -162,7 +198,7 @@ func newIamPolicyGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -192,7 +228,7 @@ func newIamPolicyCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies")
 			if err != nil {
 				return err
 			}
@@ -250,7 +286,7 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -295,7 +331,7 @@ func newIamPolicyDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -321,7 +357,7 @@ func newIamPolicyListRolesCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List roles with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies/{policy_id}/roles")
 			if err != nil {
 				return err
 			}
@@ -355,7 +391,7 @@ func newIamPolicyListServiceAccountsCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List service accounts with policy.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/policies/{policy_id}/service-accounts")
 			if err != nil {
 				return err
 			}
@@ -398,7 +434,7 @@ func newIamRegionListCommand(state *cli.State) *cobra.Command {
 		Short: "List regions (legacy IAM)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/regions")
 			if err != nil {
 				return err
 			}
@@ -453,7 +489,7 @@ func newIamRoleListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List roles.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles")
 			if err != nil {
 				return err
 			}
@@ -486,7 +522,7 @@ func newIamRoleGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get role.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}")
 			if err != nil {
 				return err
 			}
@@ -516,7 +552,7 @@ func newIamRoleCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles")
 			if err != nil {
 				return err
 			}
@@ -573,7 +609,7 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update role",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}")
 			if err != nil {
 				return err
 			}
@@ -618,7 +654,7 @@ func newIamRoleDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete role",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}")
 			if err != nil {
 				return err
 			}
@@ -645,7 +681,7 @@ func newIamRoleAssumeCommand(state *cli.State) *cobra.Command {
 		Short: "Assume role",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/assume-role")
 			if err != nil {
 				return err
 			}
@@ -690,7 +726,7 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 		Short: "Assume role with web identity",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/assume-role-with-web-identity")
 			if err != nil {
 				return err
 			}
@@ -737,7 +773,7 @@ func newIamRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -773,7 +809,7 @@ func newIamRoleDeleteInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Delete a role's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -796,7 +832,7 @@ func newIamRoleDetachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Detach policy from role",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -819,7 +855,7 @@ func newIamRoleGetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Get a role's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -842,7 +878,7 @@ func newIamRoleGetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 		Short: "Get a role's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -866,7 +902,7 @@ func newIamRoleListInlinePoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List a role's inline policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/inline-policies")
 			if err != nil {
 				return err
 			}
@@ -892,7 +928,7 @@ func newIamRoleListPoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List role policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -917,7 +953,7 @@ func newIamRoleRemovePermissionBoundaryCommand(state *cli.State) *cobra.Command 
 		Short: "Remove a role's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -943,7 +979,7 @@ func newIamRoleSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Create or replace a role's inline policy",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -981,7 +1017,7 @@ func newIamRoleSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 		Short: "Set a role's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/roles/{role_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -1019,14 +1055,18 @@ func newIamServiceAccountCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newIamServiceAccountDeleteCommand(state))
 	cmd.AddCommand(newIamServiceAccountAttachPolicyCommand(state))
 	cmd.AddCommand(newIamServiceAccountCreateCredentialCommand(state))
+	cmd.AddCommand(newIamServiceAccountCreateSshKeyCommand(state))
 	cmd.AddCommand(newIamServiceAccountDeleteCredentialCommand(state))
 	cmd.AddCommand(newIamServiceAccountDeleteInlinePolicyCommand(state))
+	cmd.AddCommand(newIamServiceAccountDeleteSshKeyCommand(state))
 	cmd.AddCommand(newIamServiceAccountDetachPolicyCommand(state))
 	cmd.AddCommand(newIamServiceAccountGetInlinePolicyCommand(state))
+	cmd.AddCommand(newIamServiceAccountGetLinuxIdentityCommand(state))
 	cmd.AddCommand(newIamServiceAccountGetPermissionBoundaryCommand(state))
 	cmd.AddCommand(newIamServiceAccountListCredentialsCommand(state))
 	cmd.AddCommand(newIamServiceAccountListInlinePoliciesCommand(state))
 	cmd.AddCommand(newIamServiceAccountListPoliciesCommand(state))
+	cmd.AddCommand(newIamServiceAccountListSshKeysCommand(state))
 	cmd.AddCommand(newIamServiceAccountRemovePermissionBoundaryCommand(state))
 	cmd.AddCommand(newIamServiceAccountSetInlinePolicyCommand(state))
 	cmd.AddCommand(newIamServiceAccountSetPermissionBoundaryCommand(state))
@@ -1043,7 +1083,7 @@ func newIamServiceAccountListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List service accounts.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts")
 			if err != nil {
 				return err
 			}
@@ -1076,7 +1116,7 @@ func newIamServiceAccountGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get service account.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}")
 			if err != nil {
 				return err
 			}
@@ -1105,7 +1145,7 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts")
 			if err != nil {
 				return err
 			}
@@ -1156,7 +1196,7 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update service account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}")
 			if err != nil {
 				return err
 			}
@@ -1199,7 +1239,7 @@ func newIamServiceAccountDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete service account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}")
 			if err != nil {
 				return err
 			}
@@ -1226,7 +1266,7 @@ func newIamServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1265,7 +1305,7 @@ func newIamServiceAccountCreateCredentialCommand(state *cli.State) *cobra.Comman
 		Short: "Create credential",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/credentials")
 			if err != nil {
 				return err
 			}
@@ -1297,6 +1337,50 @@ func newIamServiceAccountCreateCredentialCommand(state *cli.State) *cobra.Comman
 	return cmd
 }
 
+// newIamServiceAccountCreateSshKeyCommand builds `basaltic iam service-account create-ssh-key`.
+func newIamServiceAccountCreateSshKeyCommand(state *cli.State) *cobra.Command {
+	var body iam.SSHKeyCreateRequest
+	var bodyFile string
+	var expiresAtFlag string
+	cmd := &cobra.Command{
+		Use:   "create-ssh-key <service-account-id>",
+		Short: "Add service-account SSH key",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/ssh-keys")
+			if err != nil {
+				return err
+			}
+			if bodyFile != "" {
+				if err := loadBody(bodyFile, &body); err != nil {
+					return err
+				}
+			}
+			if expiresAtFlag != "" {
+				parsed, err := parseTime(expiresAtFlag)
+				if err != nil {
+					return fmt.Errorf("--expires-at: %w", err)
+				}
+				body.ExpiresAt = &parsed
+			}
+			out, err := c.CreateServiceAccountSSHKey(cmd.Context(), args[0], &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&expiresAtFlag, "expires-at", "", "Optional expiry at least one minute in the future (RFC 3339)")
+	f.StringVar(&body.Name, "name", "", "Name")
+	_ = cmd.MarkFlagRequired("name")
+	f.StringVar(&body.PublicKey, "public-key", "", "One OpenSSH public key")
+	_ = cmd.MarkFlagRequired("public-key")
+	return cmd
+}
+
 // newIamServiceAccountDeleteCredentialCommand builds `basaltic iam service-account delete-credential`.
 func newIamServiceAccountDeleteCredentialCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -1304,7 +1388,7 @@ func newIamServiceAccountDeleteCredentialCommand(state *cli.State) *cobra.Comman
 		Short: "Delete credential",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/credentials/{credential_id}")
 			if err != nil {
 				return err
 			}
@@ -1327,7 +1411,7 @@ func newIamServiceAccountDeleteInlinePolicyCommand(state *cli.State) *cobra.Comm
 		Short: "Delete a service account's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -1343,6 +1427,29 @@ func newIamServiceAccountDeleteInlinePolicyCommand(state *cli.State) *cobra.Comm
 	return cmd
 }
 
+// newIamServiceAccountDeleteSshKeyCommand builds `basaltic iam service-account delete-ssh-key`.
+func newIamServiceAccountDeleteSshKeyCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete-ssh-key <service-account-id> <ssh-key-id>",
+		Short: "Revoke service-account SSH key",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/ssh-keys/{ssh_key_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteServiceAccountSSHKey(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			state.Printer().Done("Delete ssh key requested.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
 // newIamServiceAccountDetachPolicyCommand builds `basaltic iam service-account detach-policy`.
 func newIamServiceAccountDetachPolicyCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -1350,7 +1457,7 @@ func newIamServiceAccountDetachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Detach policy from service account",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1373,11 +1480,34 @@ func newIamServiceAccountGetInlinePolicyCommand(state *cli.State) *cobra.Command
 		Short: "Get a service account's inline policy by name",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
 			out, err := c.GetServiceAccountInlinePolicy(cmd.Context(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newIamServiceAccountGetLinuxIdentityCommand builds `basaltic iam service-account get-linux-identity`.
+func newIamServiceAccountGetLinuxIdentityCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-linux-identity <service-account-id>",
+		Short: "Get serviceaccount Linux identity",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/linux-identity")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetServiceAccountLinuxIdentity(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -1396,7 +1526,7 @@ func newIamServiceAccountGetPermissionBoundaryCommand(state *cli.State) *cobra.C
 		Short: "Get a service account's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -1420,7 +1550,7 @@ func newIamServiceAccountListCredentialsCommand(state *cli.State) *cobra.Command
 		Short: "List credentials",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/credentials")
 			if err != nil {
 				return err
 			}
@@ -1446,7 +1576,7 @@ func newIamServiceAccountListInlinePoliciesCommand(state *cli.State) *cobra.Comm
 		Short: "List a service account's inline policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/inline-policies")
 			if err != nil {
 				return err
 			}
@@ -1472,7 +1602,7 @@ func newIamServiceAccountListPoliciesCommand(state *cli.State) *cobra.Command {
 		Short: "List service account policies",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
 			}
@@ -1490,6 +1620,29 @@ func newIamServiceAccountListPoliciesCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newIamServiceAccountListSshKeysCommand builds `basaltic iam service-account list-ssh-keys`.
+func newIamServiceAccountListSshKeysCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list-ssh-keys <service-account-id>",
+		Short: "List service-account SSH keys",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/ssh-keys")
+			if err != nil {
+				return err
+			}
+			out, err := c.ListServiceAccountSSHKeys(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
 // newIamServiceAccountRemovePermissionBoundaryCommand builds `basaltic iam service-account remove-permission-boundary`.
 func newIamServiceAccountRemovePermissionBoundaryCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -1497,7 +1650,7 @@ func newIamServiceAccountRemovePermissionBoundaryCommand(state *cli.State) *cobr
 		Short: "Remove a service account's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -1523,7 +1676,7 @@ func newIamServiceAccountSetInlinePolicyCommand(state *cli.State) *cobra.Command
 		Short: "Create or replace a service account's inline policy",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
 			}
@@ -1561,7 +1714,7 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 		Short: "Set a service account's permission boundary",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/permission-boundary")
 			if err != nil {
 				return err
 			}
@@ -1582,6 +1735,109 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
 	_ = cmd.MarkFlagRequired("policy")
+	return cmd
+}
+
+// newIamSshKeyCommand builds `basaltic iam ssh-key`.
+func newIamSshKeyCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "ssh-key",
+		Short:   "Ssh keys",
+		Aliases: []string{"ssh-keys"},
+	}
+	cmd.AddCommand(newIamSshKeyListCommand(state))
+	cmd.AddCommand(newIamSshKeyCreateCommand(state))
+	cmd.AddCommand(newIamSshKeyDeleteCommand(state))
+	return cmd
+}
+
+// newIamSshKeyListCommand builds `basaltic iam ssh-key list`.
+func newIamSshKeyListCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List personal SSH keys",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/auth/ssh-keys")
+			if err != nil {
+				return err
+			}
+			out, err := c.ListPersonalSSHKeys(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newIamSshKeyCreateCommand builds `basaltic iam ssh-key create`.
+func newIamSshKeyCreateCommand(state *cli.State) *cobra.Command {
+	var body iam.SSHKeyCreateRequest
+	var bodyFile string
+	var expiresAtFlag string
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Add personal SSH key",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/auth/ssh-keys")
+			if err != nil {
+				return err
+			}
+			if bodyFile != "" {
+				if err := loadBody(bodyFile, &body); err != nil {
+					return err
+				}
+			}
+			if expiresAtFlag != "" {
+				parsed, err := parseTime(expiresAtFlag)
+				if err != nil {
+					return fmt.Errorf("--expires-at: %w", err)
+				}
+				body.ExpiresAt = &parsed
+			}
+			out, err := c.CreatePersonalSSHKey(cmd.Context(), &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&expiresAtFlag, "expires-at", "", "Optional expiry at least one minute in the future (RFC 3339)")
+	f.StringVar(&body.Name, "name", "", "Name")
+	_ = cmd.MarkFlagRequired("name")
+	f.StringVar(&body.PublicKey, "public-key", "", "One OpenSSH public key")
+	_ = cmd.MarkFlagRequired("public-key")
+	return cmd
+}
+
+// newIamSshKeyDeleteCommand builds `basaltic iam ssh-key delete`.
+func newIamSshKeyDeleteCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <ssh-key-id>",
+		Short: "Revoke personal SSH key",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/auth/ssh-keys/{ssh_key_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DeletePersonalSSHKey(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			state.Printer().Done("Deleted.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
@@ -1609,7 +1865,7 @@ func newIamStsSessionListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List STS sessions.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/sts-sessions")
 			if err != nil {
 				return err
 			}
@@ -1649,7 +1905,7 @@ func newIamStsSessionGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get STS session.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --principal or --role with a name, or the\nlookup can match more than one and is refused.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/sts-sessions/{session_id}")
 			if err != nil {
 				return err
 			}
@@ -1677,7 +1933,7 @@ func newIamStsSessionRevokeCommand(state *cli.State) *cobra.Command {
 		Short: "Revoke STS session",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/sts-sessions/{session_id}")
 			if err != nil {
 				return err
 			}
@@ -1731,7 +1987,7 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Exchange an access key for a bearer token",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/oauth/token")
 			if err != nil {
 				return err
 			}
@@ -1793,7 +2049,7 @@ func newIamTokenRevokeCommand(state *cli.State) *cobra.Command {
 		Short: "Revoke a bearer token",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state)
+			c, err := iamClient(state, "/v1/oauth/revoke")
 			if err != nil {
 				return err
 			}

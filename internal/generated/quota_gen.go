@@ -27,8 +27,8 @@ func newQuotaCommand(state *cli.State) *cobra.Command {
 }
 
 // quotaClient builds the service client, resolving credentials on first use.
-func quotaClient(state *cli.State) (*quota.Client, error) {
-	cfg, err := state.SDK()
+func quotaClient(state *cli.State, path string) (*quota.Client, error) {
+	cfg, err := state.ServiceSDK("quota", path)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func newQuotaQuotaListCommand(state *cli.State) *cobra.Command {
 		Short: "List quotas",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := quotaClient(state)
+			c, err := quotaClient(state, "/v1/quotas")
 			if err != nil {
 				return err
 			}

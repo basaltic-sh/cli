@@ -69,7 +69,7 @@ func emitByReferenceGet(b *strings.Builder, svc service, r resourceGroup, op ope
 	fmt.Fprintf(b, "\t\tArgs:  cobra.ExactArgs(%d),\n", len(op.PathParams))
 	fmt.Fprintf(b, "\t\tLong: %s,\n", quote(strings.Join(long, "\n\n")))
 	b.WriteString("\t\tRunE: func(cmd *cobra.Command, args []string) error {\n")
-	fmt.Fprintf(b, "\t\t\tc, err := %sClient(state)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", unexported(svc.Name))
+	fmt.Fprintf(b, "\t\t\tc, err := %sClient(state, %q)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", unexported(svc.Name), op.Path)
 
 	callArgs := []string{"cmd.Context()"}
 	for i := range op.PathParams {

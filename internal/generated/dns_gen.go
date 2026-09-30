@@ -32,8 +32,8 @@ func newDnsCommand(state *cli.State) *cobra.Command {
 }
 
 // dnsClient builds the service client, resolving credentials on first use.
-func dnsClient(state *cli.State) (*dns.Client, error) {
-	cfg, err := state.SDK()
+func dnsClient(state *cli.State, path string) (*dns.Client, error) {
+	cfg, err := state.ServiceSDK("dns", path)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func newDnsRecordListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "List records.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/records")
 			if err != nil {
 				return err
 			}
@@ -104,7 +104,7 @@ func newDnsRecordGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		Long:  "Get record.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/records/{record_id}")
 			if err != nil {
 				return err
 			}
@@ -133,7 +133,7 @@ func newDnsRecordCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create record.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/records")
 			if err != nil {
 				return err
 			}
@@ -186,7 +186,7 @@ func newDnsRecordUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update record",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/records/{record_id}")
 			if err != nil {
 				return err
 			}
@@ -225,7 +225,7 @@ func newDnsRecordDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete record",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/records/{record_id}")
 			if err != nil {
 				return err
 			}
@@ -274,7 +274,7 @@ func newDnsZoneListCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "List zones.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones")
 			if err != nil {
 				return err
 			}
@@ -307,7 +307,7 @@ func newDnsZoneGetCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Get zone.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}")
 			if err != nil {
 				return err
 			}
@@ -339,7 +339,7 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create zone.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones")
 			if err != nil {
 				return err
 			}
@@ -402,7 +402,7 @@ func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 		Short: "Update zone",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}")
 			if err != nil {
 				return err
 			}
@@ -441,7 +441,7 @@ func newDnsZoneDeleteCommand(state *cli.State) *cobra.Command {
 		Short: "Delete zone",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}")
 			if err != nil {
 				return err
 			}
@@ -468,7 +468,7 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Associate a VPC with a private zone.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/vpc-associations")
 			if err != nil {
 				return err
 			}
@@ -504,7 +504,7 @@ func newDnsZoneDeleteRecordImportCommand(state *cli.State) *cobra.Command {
 		Short: "Discard the record-import outcome",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/record-import")
 			if err != nil {
 				return err
 			}
@@ -527,7 +527,7 @@ func newDnsZoneDissociateVpcAssociationCommand(state *cli.State) *cobra.Command 
 		Short: "Dissociate a VPC from a private zone",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/vpc-associations/{vpc_id}")
 			if err != nil {
 				return err
 			}
@@ -550,7 +550,7 @@ func newDnsZoneExportCommand(state *cli.State) *cobra.Command {
 		Short: "Export the zone as a zone file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/export")
 			if err != nil {
 				return err
 			}
@@ -573,7 +573,7 @@ func newDnsZoneGetRecordImportCommand(state *cli.State) *cobra.Command {
 		Short: "Get the record-import outcome",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/record-import")
 			if err != nil {
 				return err
 			}
@@ -600,7 +600,7 @@ func newDnsZoneImportCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Import a zone file.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/import")
 			if err != nil {
 				return err
 			}
@@ -637,7 +637,7 @@ func newDnsZoneListVpcAssociationsCommand(state *cli.State) *cobra.Command {
 		Short: "List VPC associations",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/vpc-associations")
 			if err != nil {
 				return err
 			}
@@ -664,7 +664,7 @@ func newDnsZoneVerifyOwnershipCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Long:  "Verify zone ownership.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := dnsClient(state)
+			c, err := dnsClient(state, "/v1/zones/{zone_id}/verify-ownership")
 			if err != nil {
 				return err
 			}

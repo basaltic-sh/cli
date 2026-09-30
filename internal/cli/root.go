@@ -27,10 +27,11 @@ type contextKey struct{}
 // State is what every command needs: how to reach the platform, and how to
 // print what comes back.
 type State struct {
-	opts     auth.Options
-	printer  *output.Printer
-	resolved *auth.Resolved
-	checker  *selfupdate.Checker
+	opts       auth.Options
+	printer    *output.Printer
+	resolved   *auth.Resolved
+	accountSDK *basaltic.Config
+	checker    *selfupdate.Checker
 }
 
 // Printer returns the configured renderer.
@@ -49,6 +50,24 @@ func (s *State) SDK() (*basaltic.Config, error) {
 		s.resolved = r
 	}
 	return s.resolved.Config, nil
+}
+
+// ServiceSDK automatically uses the human's sole account role for account
+// resources while personal and organization operations retain the user session.
+func (s *State) ServiceSDK(service, path string) (*basaltic.Config, error) {
+	base, err := s.SDK()
+	if err != nil {
+		return nil, err
+	}
+	if !s.resolved.UserSession || !auth.AccountScoped(service, path) {
+		return base, nil
+	}
+	if s.accountSDK == nil {
+		clone := *base
+		clone.TokenSource = &auth.AccountRoleSource{Base: base}
+		s.accountSDK = &clone
+	}
+	return s.accountSDK, nil
 }
 
 // PublicSDK resolves endpoint settings without requiring a login or account.
