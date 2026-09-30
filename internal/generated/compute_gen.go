@@ -617,6 +617,7 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstanceUpdateRequest
 	var bodyFile string
 	var descriptionFlag string
+	var iamRoleFlag string
 	var metadataFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -635,6 +636,9 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
+			}
+			if cmd.Flags().Changed("iam-role") {
+				body.IAMRole = &iamRoleFlag
 			}
 			if metadataFlag != "" {
 				if err := json.Unmarshal([]byte(metadataFlag), &body.Metadata); err != nil {
@@ -657,6 +661,7 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach or replace the instance workload role using its ID, name, or CRN")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
