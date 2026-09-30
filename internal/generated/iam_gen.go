@@ -395,7 +395,7 @@ func newIamRegionListCommand(state *cli.State) *cobra.Command {
 	var params iam.ListRegionsParams
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List regions",
+		Short: "List regions (legacy IAM)",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state)

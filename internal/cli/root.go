@@ -51,6 +51,15 @@ func (s *State) SDK() (*basaltic.Config, error) {
 	return s.resolved.Config, nil
 }
 
+// PublicSDK resolves endpoint settings without requiring a login or account.
+func (s *State) PublicSDK() (*basaltic.Config, error) {
+	resolved, err := auth.ResolvePublic(s.opts)
+	if err != nil {
+		return nil, err
+	}
+	return resolved.Config, nil
+}
+
 // Resolved exposes the full resolution for `auth status`.
 func (s *State) Resolved() (*auth.Resolved, error) {
 	if _, err := s.SDK(); err != nil {

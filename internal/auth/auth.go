@@ -48,7 +48,12 @@ type Resolved struct {
 // Precedence, highest first: an explicit flag, the environment, the profile.
 // The SDK reads the same environment variables, but the CLI resolves them
 // itself so that `auth status` can say where each value came from.
-func Resolve(opts Options) (*Resolved, error) {
+func Resolve(opts Options) (*Resolved, error) { return resolve(opts, false) }
+
+// ResolvePublic keeps endpoint/profile settings without loading credentials.
+func ResolvePublic(opts Options) (*Resolved, error) { return resolve(opts, true) }
+
+func resolve(opts Options, public bool) (*Resolved, error) {
 	file, err := config.Load()
 	if err != nil {
 		return nil, err
@@ -77,6 +82,15 @@ func Resolve(opts Options) (*Resolved, error) {
 	}
 
 	res := &Resolved{Profile: name, Region: region, AccountID: accountID}
+	if public {
+		cfg, err := basaltic.NewConfig(context.Background(), append(sdkOpts, basaltic.WithAnonymousAccess(), basaltic.WithAccountID(""))...)
+		if err != nil {
+			return nil, err
+		}
+		res.Config = cfg
+		res.AccountID = ""
+		return res, nil
+	}
 
 	// A token supplied directly wins: something upstream already holds one,
 	// and the CLI has no key pair to exchange.

@@ -55,9 +55,19 @@ func emitService(outDir string, svc service, resources []resourceGroup) error {
 	b.WriteString("\treturn cmd\n}\n\n")
 
 	// Client helper.
-	fmt.Fprintf(&b, "// %sClient builds the service client, resolving credentials on first use.\n", unexported(svc.Name))
+	configMethod := "SDK"
+	public := len(svc.Operations) > 0
+	for _, op := range svc.Operations {
+		public = public && op.Unauthenticated
+	}
+	if public {
+		configMethod = "PublicSDK"
+		fmt.Fprintf(&b, "// %sClient builds the public service client without credentials.\n", unexported(svc.Name))
+	} else {
+		fmt.Fprintf(&b, "// %sClient builds the service client, resolving credentials on first use.\n", unexported(svc.Name))
+	}
 	fmt.Fprintf(&b, "func %sClient(state *cli.State) (*%s.Client, error) {\n", unexported(svc.Name), pkg)
-	b.WriteString("\tcfg, err := state.SDK()\n\tif err != nil {\n\t\treturn nil, err\n\t}\n")
+	fmt.Fprintf(&b, "\tcfg, err := state.%s()\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", configMethod)
 	fmt.Fprintf(&b, "\treturn %s.New(cfg), nil\n}\n\n", pkg)
 
 	for _, r := range resources {

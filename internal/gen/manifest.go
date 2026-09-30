@@ -27,24 +27,25 @@ type service struct {
 }
 
 type operation struct {
-	ID         string  `json:"id"`
-	GoName     string  `json:"go_name"`
-	Method     string  `json:"method"`
-	Path       string  `json:"path"`
-	Summary    string  `json:"summary"`
-	Resource   string  `json:"resource"`
-	Verb       string  `json:"verb"`
-	PathParams []param `json:"path_params"`
-	ParamsType string  `json:"params_type"`
-	Params     []field `json:"params"`
-	BodyType   string  `json:"body_type"`
-	BodyKind   string  `json:"body_kind"`
-	BodyFields []field `json:"body_fields"`
-	ResultKind string  `json:"result_kind"`
-	ResultType string  `json:"result_type"`
-	ItemType   string  `json:"item_type"`
-	Paginated  bool    `json:"paginated"`
-	Idempotent bool    `json:"idempotent"`
+	Unauthenticated bool    `json:"unauthenticated"`
+	ID              string  `json:"id"`
+	GoName          string  `json:"go_name"`
+	Method          string  `json:"method"`
+	Path            string  `json:"path"`
+	Summary         string  `json:"summary"`
+	Resource        string  `json:"resource"`
+	Verb            string  `json:"verb"`
+	PathParams      []param `json:"path_params"`
+	ParamsType      string  `json:"params_type"`
+	Params          []field `json:"params"`
+	BodyType        string  `json:"body_type"`
+	BodyKind        string  `json:"body_kind"`
+	BodyFields      []field `json:"body_fields"`
+	ResultKind      string  `json:"result_kind"`
+	ResultType      string  `json:"result_type"`
+	ItemType        string  `json:"item_type"`
+	Paginated       bool    `json:"paginated"`
+	Idempotent      bool    `json:"idempotent"`
 	// ByReference is set on a get whose resource also has a list: the SDK
 	// emits a Get<Resource>ByReference beside it, and the CLI's `get` takes
 	// a reference — id, CRN or name — instead of only an id.

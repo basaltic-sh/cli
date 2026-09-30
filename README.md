@@ -43,6 +43,15 @@ snap or a system package is left alone with a note to use that instead.
 
 ## Getting started
 
+Discover regions without signing in:
+
+```bash
+basaltic catalog region list
+basaltic catalog region get sa-saopaulo-1
+```
+
+Sign in to manage your resources:
+
 ```bash
 basaltic auth login --api-key ACCESS_KEY_ID:SECRET --set-region sa-saopaulo-1
 basaltic compute instance list

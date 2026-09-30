@@ -120,15 +120,15 @@ func TestTreeIsServiceResourceVerb(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"audit", "billing", "certificate", "compute", "dns", "iam",
+		"audit", "billing", "catalog", "certificate", "compute", "dns", "iam",
 		"kms", "loadbalancer", "network", "quota", "secrets", "storage", "telemetry", "workspace",
 	} {
 		if !services[want] {
 			t.Errorf("no top-level command for the %s service", want)
 		}
 	}
-	if len(services) != 14 {
-		t.Errorf("found %d services at the top level, want 14", len(services))
+	if len(services) != 15 {
+		t.Errorf("found %d services at the top level, want 15", len(services))
 	}
 
 	// Nothing that is not part of the release should be reachable.
