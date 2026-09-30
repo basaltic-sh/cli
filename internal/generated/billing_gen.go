@@ -25,9 +25,11 @@ func newBillingCommand(state *cli.State) *cobra.Command {
 		Short: "Invoices, credits, payments and prices",
 	}
 	cmd.AddCommand(newBillingCreditCommand(state))
+	cmd.AddCommand(newBillingFiscalInvoiceCommand(state))
 	cmd.AddCommand(newBillingInvoiceCommand(state))
 	cmd.AddCommand(newBillingPaymentCommand(state))
 	cmd.AddCommand(newBillingPriceCommand(state))
+	cmd.AddCommand(newBillingProfileCommand(state))
 	cmd.AddCommand(newBillingTransactionCommand(state))
 	cmd.AddCommand(newBillingUsageCommand(state))
 	return cmd
@@ -83,6 +85,66 @@ func newBillingCreditListCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
+// newBillingFiscalInvoiceCommand builds `basaltic billing fiscal-invoice`.
+func newBillingFiscalInvoiceCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "fiscal-invoice",
+		Short:   "Fiscal invoices",
+		Aliases: []string{"fiscal-invoices"},
+	}
+	cmd.AddCommand(newBillingFiscalInvoiceListCommand(state))
+	cmd.AddCommand(newBillingFiscalInvoiceGetXmlCommand(state))
+	return cmd
+}
+
+// newBillingFiscalInvoiceListCommand builds `basaltic billing fiscal-invoice list`.
+func newBillingFiscalInvoiceListCommand(state *cli.State) *cobra.Command {
+	var params billing.ListFiscalInvoicesParams
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List fiscal invoice issuance and delivery status",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := billingClient(state)
+			if err != nil {
+				return err
+			}
+			out, err := c.ListFiscalInvoices(cmd.Context(), &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.Invoice, "invoice", "", "Canonical billing invoice CRN")
+	return cmd
+}
+
+// newBillingFiscalInvoiceGetXmlCommand builds `basaltic billing fiscal-invoice get-xml`.
+func newBillingFiscalInvoiceGetXmlCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-xml <document-id>",
+		Short: "Download issued NFS-e XML",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := billingClient(state)
+			if err != nil {
+				return err
+			}
+			stream, err := c.GetFiscalInvoiceXml(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Stream(stream)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
@@ -269,6 +331,90 @@ func newBillingPriceListCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&params.ResourceType, "resource-type", "", "Resource type")
 	f.StringVar(&params.Service, "service", "", "Only SKUs billed by this service")
 	f.StringVar(&params.Sku, "sku", "", "Exactly one SKU")
+	return cmd
+}
+
+// newBillingProfileCommand builds `basaltic billing profile`.
+func newBillingProfileCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "profile",
+		Short:   "Profiles",
+		Aliases: []string{"profiles"},
+	}
+	cmd.AddCommand(newBillingProfileListCommand(state))
+	cmd.AddCommand(newBillingProfileUpdateCommand(state))
+	return cmd
+}
+
+// newBillingProfileListCommand builds `basaltic billing profile list`.
+func newBillingProfileListCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "Read the organization billing profile",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := billingClient(state)
+			if err != nil {
+				return err
+			}
+			out, err := c.GetBillingProfile(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newBillingProfileUpdateCommand builds `basaltic billing profile update`.
+func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
+	var body billing.BillingProfile
+	var bodyFile string
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Save organization billing details",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := billingClient(state)
+			if err != nil {
+				return err
+			}
+			if bodyFile != "" {
+				if err := loadBody(bodyFile, &body); err != nil {
+					return err
+				}
+			}
+			out, err := c.UpdateBillingProfile(cmd.Context(), &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.City, "city", "", "City")
+	f.StringVar(&body.CompanyName, "company-name", "", "Full legal name of the individual or company")
+	f.StringVar(&body.Complement, "complement", "", "Complement")
+	f.StringVar(&body.Country, "country", "", "ISO 3166-1 alpha-2 country code")
+	f.StringVar(&body.CustomerType, "customer-type", "", "Customer type (one of: , individual, company)")
+	f.StringVar(&body.Email, "email", "", "Billing email for fiscal invoice delivery")
+	f.StringVar(&body.ForeignTaxID, "foreign-tax-id", "", "Foreign identifier; not validated as a Brazilian document")
+	f.StringSliceVar(&body.MissingFields, "missing-fields", nil, "Missing fields")
+	f.StringVar(&body.MunicipalityCode, "municipality-code", "", "Seven-digit IBGE municipality code, required for a Brazilian recipient")
+	f.StringVar(&body.Neighborhood, "neighborhood", "", "Neighborhood")
+	f.StringVar(&body.NoTaxIDReason, "no-tax-id-reason", "", "Required for a foreign recipient without a tax identifier")
+	f.StringVar(&body.Phone, "phone", "", "Phone")
+	f.StringVar(&body.PostalCode, "postal-code", "", "Eight-digit CEP for Brazil; optional international postal code abroad")
+	f.BoolVar(&body.Ready, "ready", false, "Ready")
+	f.StringVar(&body.State, "state", "", "Two-letter UF for Brazil; free-form state/province abroad")
+	f.StringVar(&body.StreetName, "street-name", "", "Street name")
+	f.StringVar(&body.StreetNumber, "street-number", "", "Street number")
+	f.StringVar(&body.TaxID, "tax-id", "", "CPF for a Brazilian individual or CNPJ for a Brazilian company")
 	return cmd
 }
 

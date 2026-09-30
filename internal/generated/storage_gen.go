@@ -9,7 +9,6 @@ package generated
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -388,19 +387,11 @@ func newStorageBucketGetLifecycleCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var headers http.Header
-			out, err := c.GetBucketLifecycle(cmd.Context(), args[0], basaltic.WithResponseHeader(&headers))
+			out, err := c.GetBucketLifecycle(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			revision, err := strconv.Unquote(headers.Get("ETag"))
-			if err != nil {
-				return fmt.Errorf("server did not return a lifecycle revision: %w", err)
-			}
-			return state.Printer().Value(struct {
-				Revision  string `json:"revision"`
-				Lifecycle any    `json:"lifecycle"`
-			}{revision, out})
+			return state.Printer().Value(out)
 		},
 	}
 	f := cmd.Flags()

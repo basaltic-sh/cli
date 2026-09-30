@@ -57,10 +57,12 @@ func TestLifecycleRevisionRoundTrip(t *testing.T) {
 		t.Fatalf("get: %v: %s", err, out)
 	}
 	var result struct {
-		Revision  string          `json:"revision"`
-		Lifecycle json.RawMessage `json:"lifecycle"`
+		Revision  string `json:"revision"`
+		Lifecycle struct {
+			Rules []json.RawMessage `json:"rules"`
+		} `json:"lifecycle"`
 	}
-	if err := json.Unmarshal(out, &result); err != nil || result.Revision != "revision-1" || len(result.Lifecycle) == 0 {
+	if err := json.Unmarshal(out, &result); err != nil || result.Revision != "revision-1" || result.Lifecycle.Rules == nil {
 		t.Fatalf("revision missing from output: %s (%v)", out, err)
 	}
 	if got := <-requests; got != "GET " {

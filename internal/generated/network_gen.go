@@ -63,6 +63,7 @@ func newNetworkEgressOnlyGatewayCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkEgressOnlyGatewayCreateCommand(state))
 	cmd.AddCommand(newNetworkEgressOnlyGatewayUpdateCommand(state))
 	cmd.AddCommand(newNetworkEgressOnlyGatewayDeleteCommand(state))
+	cmd.AddCommand(newNetworkEgressOnlyGatewayListRoutesCommand(state))
 	return cmd
 }
 
@@ -242,6 +243,40 @@ func newNetworkEgressOnlyGatewayDeleteCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newNetworkEgressOnlyGatewayListRoutesCommand builds `basaltic network egress-only-gateway list-routes`.
+func newNetworkEgressOnlyGatewayListRoutesCommand(state *cli.State) *cobra.Command {
+	var params network.ListEgressOnlyGatewayRoutesParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-routes <egress-only-gateway-id>",
+		Short: "List egress-only gateway routes",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List egress-only gateway routes.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state)
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListEgressOnlyGatewayRoutesAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListEgressOnlyGatewayRoutes(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
@@ -804,7 +839,7 @@ func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&addressFlag, "address", "", "Optional fixed IPv4 address")
+	f.StringVar(&addressFlag, "address", "", "Optional fixed address when creating an interface or instance NIC")
 	f.StringVar(&body.Family, "family", "", "Family (one of: ipv4, ipv6)")
 	_ = cmd.MarkFlagRequired("family")
 	return cmd
@@ -1031,6 +1066,7 @@ func newNetworkInternetGatewayCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkInternetGatewayDeleteCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayAttachCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayDetachCommand(state))
+	cmd.AddCommand(newNetworkInternetGatewayListRoutesCommand(state))
 	return cmd
 }
 
@@ -1281,6 +1317,40 @@ func newNetworkInternetGatewayDetachCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newNetworkInternetGatewayListRoutesCommand builds `basaltic network internet-gateway list-routes`.
+func newNetworkInternetGatewayListRoutesCommand(state *cli.State) *cobra.Command {
+	var params network.ListInternetGatewayRoutesParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-routes <internet-gateway-id>",
+		Short: "List internet gateway routes",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List internet gateway routes.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state)
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListInternetGatewayRoutesAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListInternetGatewayRoutes(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
 // newNetworkNatGatewayCommand builds `basaltic network nat-gateway`.
 func newNetworkNatGatewayCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -1293,6 +1363,7 @@ func newNetworkNatGatewayCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkNatGatewayCreateCommand(state))
 	cmd.AddCommand(newNetworkNatGatewayUpdateCommand(state))
 	cmd.AddCommand(newNetworkNatGatewayDeleteCommand(state))
+	cmd.AddCommand(newNetworkNatGatewayListRoutesCommand(state))
 	return cmd
 }
 
@@ -1476,6 +1547,40 @@ func newNetworkNatGatewayDeleteCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newNetworkNatGatewayListRoutesCommand builds `basaltic network nat-gateway list-routes`.
+func newNetworkNatGatewayListRoutesCommand(state *cli.State) *cobra.Command {
+	var params network.ListNATGatewayRoutesParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-routes <nat-gateway-id>",
+		Short: "List NAT gateway routes",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List NAT gateway routes.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state)
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListNATGatewayRoutesAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListNATGatewayRoutes(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
+	f.StringVar(&params.Name, "name", "", "Exact resource name")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 

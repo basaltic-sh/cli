@@ -332,9 +332,6 @@ func emitCall(b *strings.Builder, svc service, op operation) {
 		switch op.ID {
 		case "putBucketLifecycle", "deleteBucketLifecycle":
 			callArgs = append(callArgs, `basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))`)
-		case "getBucketLifecycle":
-			b.WriteString("\t\t\tvar headers http.Header\n")
-			callArgs = append(callArgs, "basaltic.WithResponseHeader(&headers)")
 		}
 	}
 	call := fmt.Sprintf("c.%s(%s)", op.GoName, strings.Join(callArgs, ", "))
@@ -357,12 +354,7 @@ func emitCall(b *strings.Builder, svc service, op operation) {
 		b.WriteString("\t\t\treturn state.Printer().Stream(stream)\n")
 	default: // value
 		fmt.Fprintf(b, "\t\t\tout, err := %s\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", call)
-		if svc.Name == "storage" && op.ID == "getBucketLifecycle" {
-			b.WriteString("\t\t\trevision, err := strconv.Unquote(headers.Get(\"ETag\"))\n\t\t\tif err != nil { return fmt.Errorf(\"server did not return a lifecycle revision: %w\", err) }\n")
-			b.WriteString("\t\t\treturn state.Printer().Value(struct { Revision string `json:\"revision\"`; Lifecycle any `json:\"lifecycle\"` }{revision, out})\n")
-		} else {
-			b.WriteString("\t\t\treturn state.Printer().Value(out)\n")
-		}
+		b.WriteString("\t\t\treturn state.Printer().Value(out)\n")
 	}
 }
 

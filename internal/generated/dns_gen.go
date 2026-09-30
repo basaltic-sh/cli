@@ -379,7 +379,7 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&descriptionFlag, "description", "", "Free-form note stored with the zone")
+	f.StringVar(&descriptionFlag, "description", "", "Free-form note stored with and returned on the zone")
 	f.BoolVar(&dnssecFlag, "dnssec", false, "Sign the zone with DNSSEC")
 	f.BoolVar(&importExistingRecordsFlag, "import-existing-records", false, "Read the domain's records from the nameservers that serve it TODAY and copy them into this zone, before you move the delegation here")
 	f.StringVar(&body.Name, "name", "", "Zone FQDN")
@@ -395,6 +395,7 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 	var body dns.ZoneUpdateRequest
 	var bodyFile string
+	var descriptionFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <zone-id>",
@@ -409,6 +410,9 @@ func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
 				}
+			}
+			if cmd.Flags().Changed("description") {
+				body.Description = &descriptionFlag
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -425,6 +429,7 @@ func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&descriptionFlag, "description", "", "Omit to preserve the description; send an empty string to clear it")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }

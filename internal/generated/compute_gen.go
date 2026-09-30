@@ -1336,6 +1336,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstancePoolUpdateRequest
 	var bodyFile string
+	var descriptionFlag string
 	var desiredCountFlag int
 	var maxCountFlag int
 	var minCountFlag int
@@ -1343,7 +1344,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	var templateFlag string
 	cmd := &cobra.Command{
 		Use:   "update <pool-id>",
-		Short: "Update an instance pool's size, tags or launch template",
+		Short: "Update an instance pool's description, size, tags or launch template",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state)
@@ -1354,6 +1355,9 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
 				}
+			}
+			if cmd.Flags().Changed("description") {
+				body.Description = &descriptionFlag
 			}
 			if cmd.Flags().Changed("desired-count") {
 				body.DesiredCount = &desiredCountFlag
@@ -1384,6 +1388,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&descriptionFlag, "description", "", "Customer note on the pool")
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the resulting min_count/max_count and the hard platform cap of 100")
 	f.IntVar(&maxCountFlag, "max-count", 0, "New upper bound; omitted desired_count falls to this bound if needed")
 	f.IntVar(&minCountFlag, "min-count", 0, "New lower bound; omitted desired_count rises to this bound if needed")
