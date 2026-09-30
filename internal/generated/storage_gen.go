@@ -9,6 +9,8 @@ package generated
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -233,6 +235,7 @@ func newStorageBucketDeleteEncryptionCommand(state *cli.State) *cobra.Command {
 
 // newStorageBucketDeleteLifecycleCommand builds `basaltic storage bucket delete-lifecycle`.
 func newStorageBucketDeleteLifecycleCommand(state *cli.State) *cobra.Command {
+	var revision string
 	cmd := &cobra.Command{
 		Use:   "delete-lifecycle <bucket>",
 		Short: "Delete bucket lifecycle configuration",
@@ -242,7 +245,10 @@ func newStorageBucketDeleteLifecycleCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteBucketLifecycle(cmd.Context(), args[0]); err != nil {
+			if revision == "" {
+				return fmt.Errorf("--revision must be the value returned by get-lifecycle")
+			}
+			if err := c.DeleteBucketLifecycle(cmd.Context(), args[0], basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))); err != nil {
 				return err
 			}
 			state.Printer().Done("Delete lifecycle requested.")
@@ -251,6 +257,8 @@ func newStorageBucketDeleteLifecycleCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&revision, "revision", "", "Revision returned by get-lifecycle. A stale revision is rejected; reload and review before retrying.")
+	_ = cmd.MarkFlagRequired("revision")
 	return cmd
 }
 
@@ -380,11 +388,19 @@ func newStorageBucketGetLifecycleCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.GetBucketLifecycle(cmd.Context(), args[0])
+			var headers http.Header
+			out, err := c.GetBucketLifecycle(cmd.Context(), args[0], basaltic.WithResponseHeader(&headers))
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			revision, err := strconv.Unquote(headers.Get("ETag"))
+			if err != nil {
+				return fmt.Errorf("server did not return a lifecycle revision: %w", err)
+			}
+			return state.Printer().Value(struct {
+				Revision  string `json:"revision"`
+				Lifecycle any    `json:"lifecycle"`
+			}{revision, out})
 		},
 	}
 	f := cmd.Flags()
@@ -683,6 +699,7 @@ func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 
 // newStorageBucketSetLifecycleCommand builds `basaltic storage bucket set-lifecycle`.
 func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
+	var revision string
 	var body storage.PutBucketLifecycleRequest
 	var bodyFile string
 	var lifecycleFlag string
@@ -695,6 +712,9 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if revision == "" {
+				return fmt.Errorf("--revision must be the value returned by get-lifecycle")
+			}
 			if bodyFile != "" {
 				if err := loadBody(bodyFile, &body); err != nil {
 					return err
@@ -705,7 +725,7 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--lifecycle: %w", err)
 				}
 			}
-			if err := c.PutBucketLifecycle(cmd.Context(), args[0], &body); err != nil {
+			if err := c.PutBucketLifecycle(cmd.Context(), args[0], &body, basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))); err != nil {
 				return err
 			}
 			state.Printer().Done("Set lifecycle requested.")
@@ -714,6 +734,8 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	f.StringVar(&revision, "revision", "", "Revision returned by get-lifecycle. A stale revision is rejected; reload and review before retrying.")
+	_ = cmd.MarkFlagRequired("revision")
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&lifecycleFlag, "lifecycle", "", "Lifecycle (JSON)")
 	_ = cmd.MarkFlagRequired("lifecycle")

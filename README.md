@@ -117,6 +117,19 @@ basaltic compute instance list -o json | jq -r '.[].id'
 basaltic compute instance list --no-headers | awk '{print $1}'
 ```
 
+## Editing bucket lifecycle rules
+
+`storage bucket get-lifecycle` returns the rules and their `revision`. Pass that
+revision to `set-lifecycle` or `delete-lifecycle` with `--revision`. If someone
+changes the rules first, the server rejects the stale revision. Read the rules
+again and review your changes before retrying.
+
+```bash
+basaltic storage bucket get-lifecycle backups -o json
+basaltic storage bucket set-lifecycle backups --revision REVISION --from-file lifecycle.json
+basaltic storage bucket delete-lifecycle backups --revision REVISION
+```
+
 ## Paging
 
 List commands return one page and say when there is more. `--all` walks every

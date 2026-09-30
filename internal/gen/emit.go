@@ -94,6 +94,8 @@ func renderFile(svc service, body string) []byte {
 	code := stripComments(body)
 	for marker, imp := range map[string]string{
 		"json.Unmarshal": "encoding/json",
+		"http.Header":    "net/http",
+		"strconv.":       "strconv",
 		"fmt.":           "fmt",
 		"os.":            "os",
 		"strings.":       "strings",

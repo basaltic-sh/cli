@@ -70,6 +70,12 @@ func emitOperation(b *strings.Builder, svc service, r resourceGroup, op operatio
 //   - anything structured takes JSON, because a nested object has no honest
 //     flat representation.
 func planFlags(svc service, op operation) (decls, binds, applies []string, err error) {
+	if svc.Name == "storage" && (op.ID == "putBucketLifecycle" || op.ID == "deleteBucketLifecycle") {
+		decls = append(decls, "var revision string")
+		binds = append(binds, `f.StringVar(&revision, "revision", "", "Revision returned by get-lifecycle. A stale revision is rejected; reload and review before retrying.")`, `_ = cmd.MarkFlagRequired("revision")`)
+		applies = append(applies, `if revision == "" { return fmt.Errorf("--revision must be the value returned by get-lifecycle") }`)
+	}
+
 	if op.ParamsType != "" {
 		decls = append(decls, fmt.Sprintf("var params %s.%s", svc.Package, op.ParamsType))
 		for _, p := range op.Params {
@@ -322,6 +328,15 @@ func emitCall(b *strings.Builder, svc service, op operation) {
 		callArgs = append(callArgs, "reqOpts...")
 	}
 
+	if svc.Name == "storage" {
+		switch op.ID {
+		case "putBucketLifecycle", "deleteBucketLifecycle":
+			callArgs = append(callArgs, `basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))`)
+		case "getBucketLifecycle":
+			b.WriteString("\t\t\tvar headers http.Header\n")
+			callArgs = append(callArgs, "basaltic.WithResponseHeader(&headers)")
+		}
+	}
 	call := fmt.Sprintf("c.%s(%s)", op.GoName, strings.Join(callArgs, ", "))
 
 	switch op.ResultKind {
@@ -342,7 +357,12 @@ func emitCall(b *strings.Builder, svc service, op operation) {
 		b.WriteString("\t\t\treturn state.Printer().Stream(stream)\n")
 	default: // value
 		fmt.Fprintf(b, "\t\t\tout, err := %s\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n", call)
-		b.WriteString("\t\t\treturn state.Printer().Value(out)\n")
+		if svc.Name == "storage" && op.ID == "getBucketLifecycle" {
+			b.WriteString("\t\t\trevision, err := strconv.Unquote(headers.Get(\"ETag\"))\n\t\t\tif err != nil { return fmt.Errorf(\"server did not return a lifecycle revision: %w\", err) }\n")
+			b.WriteString("\t\t\treturn state.Printer().Value(struct { Revision string `json:\"revision\"`; Lifecycle any `json:\"lifecycle\"` }{revision, out})\n")
+		} else {
+			b.WriteString("\t\t\treturn state.Printer().Value(out)\n")
+		}
 	}
 }
 
