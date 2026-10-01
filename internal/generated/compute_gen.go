@@ -32,7 +32,6 @@ func newComputeCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newComputeImageCatalogCommand(state))
 	cmd.AddCommand(newComputeInstanceCommand(state))
 	cmd.AddCommand(newComputeInstancePoolCommand(state))
-	cmd.AddCommand(newComputeKeypairCommand(state))
 	return cmd
 }
 
@@ -599,7 +598,6 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach an IAM role from the same account by UUID, CRN or exact name")
 	f.StringVar(&imageFlag, "image", "", "Image to clone the boot disk from (required if not booting from volume)")
-	f.StringSliceVar(&body.Keypairs, "keypairs", nil, "Keypairs")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
@@ -1575,154 +1573,6 @@ func newComputeInstancePoolRefreshCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	return cmd
-}
-
-// newComputeKeypairCommand builds `basaltic compute keypair`.
-func newComputeKeypairCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "keypair",
-		Short:   "Keypairs",
-		Aliases: []string{"keypairs"},
-	}
-	cmd.AddCommand(newComputeKeypairListCommand(state))
-	cmd.AddCommand(newComputeKeypairGetCommand(state))
-	cmd.AddCommand(newComputeKeypairCreateCommand(state))
-	cmd.AddCommand(newComputeKeypairDeleteCommand(state))
-	return cmd
-}
-
-// newComputeKeypairListCommand builds `basaltic compute keypair list`.
-func newComputeKeypairListCommand(state *cli.State) *cobra.Command {
-	var params compute.ListKeypairsParams
-	var fetchAll bool
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List keypairs",
-		Args:  cobra.ExactArgs(0),
-		Long:  "List keypairs.\n\nReturns one page. Pass --all to walk every page.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/keypairs")
-			if err != nil {
-				return err
-			}
-			if fetchAll {
-				return state.Printer().Iter(c.ListKeypairsAll(cmd.Context(), &params))
-			}
-			page, err := c.ListKeypairs(cmd.Context(), &params)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Page(page)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVar(&params.CRN, "crn", "", "Exact resource CRN, intersected with all other filters before pagination")
-	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
-	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
-	f.StringVar(&params.Name, "name", "", "Exact, case-sensitive name")
-	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
-	return cmd
-}
-
-// newComputeKeypairGetCommand builds `basaltic compute keypair get`.
-func newComputeKeypairGetCommand(state *cli.State) *cobra.Command {
-	var scope compute.ListKeypairsParams
-	cmd := &cobra.Command{
-		Use:   "get <ref>",
-		Short: "Get keypair",
-		Args:  cobra.ExactArgs(1),
-		Long:  "Get keypair.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/keypairs/{keypair_id}")
-			if err != nil {
-				return err
-			}
-			out, err := c.GetKeypairByReference(cmd.Context(), args[0], &scope)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	return cmd
-}
-
-// newComputeKeypairCreateCommand builds `basaltic compute keypair create`.
-func newComputeKeypairCreateCommand(state *cli.State) *cobra.Command {
-	var body compute.KeypairCreateRequest
-	var bodyFile string
-	var publicKeyFlag string
-	var tagsFlag string
-	var idempotencyKey string
-	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create keypair",
-		Args:  cobra.ExactArgs(0),
-		Long:  "Create keypair.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/keypairs")
-			if err != nil {
-				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
-			}
-			if cmd.Flags().Changed("public-key") {
-				body.PublicKey = &publicKeyFlag
-			}
-			if tagsFlag != "" {
-				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
-					return fmt.Errorf("--tags: %w", err)
-				}
-			}
-			var reqOpts []basaltic.RequestOption
-			if idempotencyKey != "" {
-				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
-			}
-			out, err := c.CreateKeypair(cmd.Context(), &body, reqOpts...)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&publicKeyFlag, "public-key", "", "SSH public key (if not provided, a new keypair will be generated)")
-	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
-	return cmd
-}
-
-// newComputeKeypairDeleteCommand builds `basaltic compute keypair delete`.
-func newComputeKeypairDeleteCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete <keypair-id>",
-		Short: "Delete keypair",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/keypairs/{keypair_id}")
-			if err != nil {
-				return err
-			}
-			if err := c.DeleteKeypair(cmd.Context(), args[0]); err != nil {
-				return err
-			}
-			state.Printer().Done("Deleted.")
-			return nil
 		},
 	}
 	f := cmd.Flags()

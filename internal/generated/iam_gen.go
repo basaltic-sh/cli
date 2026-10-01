@@ -1137,6 +1137,7 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 	var body iam.ServiceAccountCreateRequest
 	var bodyFile string
 	var descriptionFlag string
+	var linuxUsernameFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -1156,6 +1157,9 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
+			}
+			if cmd.Flags().Changed("linux-username") {
+				body.LinuxUsername = (*iam.CustomLinuxUsername)(&linuxUsernameFlag)
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1177,6 +1181,7 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&linuxUsernameFlag, "linux-username", "", "Linux username")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
@@ -1190,6 +1195,7 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 	var bodyFile string
 	var descriptionFlag string
 	var enabledFlag bool
+	var linuxUsernameFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <service-account-id>",
@@ -1211,6 +1217,9 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("enabled") {
 				body.Enabled = &enabledFlag
 			}
+			if cmd.Flags().Changed("linux-username") {
+				body.LinuxUsername = (*iam.CustomLinuxUsername)(&linuxUsernameFlag)
+			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
 					return fmt.Errorf("--tags: %w", err)
@@ -1228,6 +1237,7 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.BoolVar(&enabledFlag, "enabled", false, "Enabled")
+	f.StringVar(&linuxUsernameFlag, "linux-username", "", "Linux username")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }

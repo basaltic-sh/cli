@@ -1588,6 +1588,7 @@ func newWorkspaceUserCommand(state *cli.State) *cobra.Command {
 	}
 	cmd.AddCommand(newWorkspaceUserListCommand(state))
 	cmd.AddCommand(newWorkspaceUserGetCommand(state))
+	cmd.AddCommand(newWorkspaceUserUpdateCommand(state))
 	cmd.AddCommand(newWorkspaceUserAddCommand(state))
 	cmd.AddCommand(newWorkspaceUserAddGroupCommand(state))
 	cmd.AddCommand(newWorkspaceUserAttachPolicyCommand(state))
@@ -1665,11 +1666,45 @@ func newWorkspaceUserGetCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newWorkspaceUserUpdateCommand builds `basaltic workspace user update`.
+func newWorkspaceUserUpdateCommand(state *cli.State) *cobra.Command {
+	var body workspace.UserUpdateRequest
+	var bodyFile string
+	cmd := &cobra.Command{
+		Use:   "update <user-id>",
+		Short: "Update user Linux username",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := workspaceClient(state, "/v1/users/{user_id}")
+			if err != nil {
+				return err
+			}
+			if bodyFile != "" {
+				if err := loadBody(bodyFile, &body); err != nil {
+					return err
+				}
+			}
+			out, err := c.UpdateUser(cmd.Context(), args[0], &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar((*string)(&body.LinuxUsername), "linux-username", "", "Linux username")
+	_ = cmd.MarkFlagRequired("linux-username")
+	return cmd
+}
+
 // newWorkspaceUserAddCommand builds `basaltic workspace user add`.
 func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 	var body workspace.UserAddRequest
 	var bodyFile string
 	var groupsFlag string
+	var linuxUsernameFlag string
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
@@ -1691,6 +1726,9 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 				if err := json.Unmarshal([]byte(groupsFlag), &body.Groups); err != nil {
 					return fmt.Errorf("--groups: %w", err)
 				}
+			}
+			if cmd.Flags().Changed("linux-username") {
+				body.LinuxUsername = (*workspace.CustomLinuxUsername)(&linuxUsernameFlag)
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -1714,6 +1752,7 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&body.Email, "email", "", "Email of the user to add")
 	_ = cmd.MarkFlagRequired("email")
 	f.StringVar(&groupsFlag, "groups", "", "Groups to assign when the invitation is accepted (JSON)")
+	f.StringVar(&linuxUsernameFlag, "linux-username", "", "Linux username")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd

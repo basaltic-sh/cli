@@ -455,7 +455,6 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&floatingIpFlag, "floating-ip", "", "Public IPv4 shorthand")
 	f.StringSliceVar(&body.FloatingIPs, "floating-ips", nil, "Existing free floating IPs from this account and region, at most one per family and visibility (private/public, IPv4/IPv6)")
-	f.StringSliceVar(&body.Keypairs, "keypairs", nil, "Platform-operator break-glass only")
 	f.StringVar(&body.Name, "name", "", "1..127 chars of [A-Za-z0-9._-] Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&replicaCountFlag, "replica-count", 0, "Number of LB compute instances")
