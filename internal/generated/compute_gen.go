@@ -272,7 +272,7 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&architectureFlag, "architecture", "", "Architecture")
+	f.StringVar(&architectureFlag, "architecture", "", "CPU architecture of the source image (one of: amd64)")
 	f.StringVar(&attributesFlag, "attributes", "", "Attributes (JSON)")
 	f.BoolVar(&currentFlag, "current", false, "Make this the current version for its (name, architecture) once active")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
@@ -281,7 +281,7 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&minRammbFlag, "min-ram-mb", 0, "Min ram mb")
 	f.StringVar(&body.Name, "name", "", "Immutable image name (e.g")
 	_ = cmd.MarkFlagRequired("name")
-	f.StringVar(&osFlag, "os", "", "Os")
+	f.StringVar(&osFlag, "os", "", "Operating system distribution (one of: almalinux, alpine, arch, centos, debian, fedora, opensuse, rhel, rocky, ubuntu, linux)")
 	f.StringVar(&osVersionFlag, "os-version", "", "Os version")
 	f.StringVar(&body.SourceURL, "source-url", "", "Presigned https GET URL to the disk in an object store you control")
 	_ = cmd.MarkFlagRequired("source-url")
