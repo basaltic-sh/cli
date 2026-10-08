@@ -5,6 +5,7 @@
 This is a release snapshot repository. Development happens in private Basaltic
 repositories; pull requests and other code contributions are not accepted here.
 For support, see [the documentation](https://docs.basaltic.sh).
+For security reports, follow [the security policy](SECURITY.md).
 
 The command-line interface for the [Basaltic](https://basaltic.sh) cloud
 platform.
