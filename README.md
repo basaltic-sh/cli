@@ -222,45 +222,24 @@ act on the credential's own account, and another account's resources answer
 "not found" rather than "not permitted" — an account you are not acting in is
 one whose resources you cannot see.
 
-## Generated code
+## Building and testing
 
-`internal/generated` is built from the SDK's `api.json`, which describes the
-SDK's Go surface: every method, its parameters and their types. The CLI does
-not read the OpenAPI specifications and does not embed a copy of them.
-
-```bash
-make generate                      # from the SDK version in go.mod
-make generate SDK=/path/to/sdk-go  # against unreleased SDK changes
-```
-
-Generated files are committed, so building the CLI needs nothing but this
-repository. Do not edit them; change the SDK, regenerate, and commit the
-result. `make check-generated` fails when the two have drifted.
-
-## Releasing
-
-Releases are published from protected version tags in the private GitLab
-repository. Each release exports a filtered source snapshot as one commit by
-`basaltic-bot[bot]`, then publishes Linux, macOS and Windows binaries and
-`checksums.txt`. Public history contains release snapshots only.
-
-Three places construct the asset names — `.goreleaser.yaml`, `install.sh`, and
-`AssetName` in `internal/selfupdate` — and nothing in an ordinary build
-compares them. `make check-release` builds a snapshot and checks all three
-agree; GitLab CI runs it on every merge request, because a rename in one breaks
-upgrades for everyone already installed while every other test stays green.
+The generated command source is included in `internal/generated`. Generation
+happens during internal development; the generator and its inputs are not
+required to build or test this snapshot.
 
 ```bash
-make snapshot        # build every platform into dist/, publish nothing
-make check-release   # and verify the three agree
-make check-pinned    # build as a consumer does, ignoring go.work
+go build -o basaltic .
+go vet ./...
+go test -race ./...
 ```
 
-`go.work` points local builds at an SDK checkout next door, which is what makes
-developing the two together bearable — and it will happily compile against SDK
-changes that no published version has. `make check-pinned` builds against the
-version `go.mod` names instead. Run it before tagging; GitLab CI runs it on every
-merge request.
+## Releases
+
+Protected version tags in the private GitLab repository publish filtered source
+snapshots here, one bot-authored commit per release. Linux, macOS and Windows
+binaries and `checksums.txt` are available on the
+[releases page](https://github.com/basaltic-sh/cli/releases).
 
 ## License
 
