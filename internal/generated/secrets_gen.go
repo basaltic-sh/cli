@@ -7,6 +7,7 @@
 package generated
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -151,8 +152,12 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			if valueFlag != "" {
-				body.Value = []byte(valueFlag)
+			if cmd.Flags().Changed("value") {
+				decoded, err := base64.StdEncoding.DecodeString(valueFlag)
+				if err != nil {
+					return fmt.Errorf("--value: invalid base64: %w", err)
+				}
+				body.Value = decoded
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -368,8 +373,12 @@ func newSecretsSecretSetValueCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if valueFlag != "" {
-				body.Value = []byte(valueFlag)
+			if cmd.Flags().Changed("value") {
+				decoded, err := base64.StdEncoding.DecodeString(valueFlag)
+				if err != nil {
+					return fmt.Errorf("--value: invalid base64: %w", err)
+				}
+				body.Value = decoded
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {

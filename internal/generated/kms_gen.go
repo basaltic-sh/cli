@@ -7,6 +7,7 @@
 package generated
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -268,11 +269,19 @@ func newKmsKeyDecryptCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if aadFlag != "" {
-				body.Aad = []byte(aadFlag)
+			if cmd.Flags().Changed("aad") {
+				decoded, err := base64.StdEncoding.DecodeString(aadFlag)
+				if err != nil {
+					return fmt.Errorf("--aad: invalid base64: %w", err)
+				}
+				body.Aad = decoded
 			}
-			if ciphertextFlag != "" {
-				body.Ciphertext = []byte(ciphertextFlag)
+			if cmd.Flags().Changed("ciphertext") {
+				decoded, err := base64.StdEncoding.DecodeString(ciphertextFlag)
+				if err != nil {
+					return fmt.Errorf("--ciphertext: invalid base64: %w", err)
+				}
+				body.Ciphertext = decoded
 			}
 			out, err := c.Decrypt(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -356,11 +365,19 @@ func newKmsKeyEncryptCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if aadFlag != "" {
-				body.Aad = []byte(aadFlag)
+			if cmd.Flags().Changed("aad") {
+				decoded, err := base64.StdEncoding.DecodeString(aadFlag)
+				if err != nil {
+					return fmt.Errorf("--aad: invalid base64: %w", err)
+				}
+				body.Aad = decoded
 			}
-			if plaintextFlag != "" {
-				body.Plaintext = []byte(plaintextFlag)
+			if cmd.Flags().Changed("plaintext") {
+				decoded, err := base64.StdEncoding.DecodeString(plaintextFlag)
+				if err != nil {
+					return fmt.Errorf("--plaintext: invalid base64: %w", err)
+				}
+				body.Plaintext = decoded
 			}
 			out, err := c.Encrypt(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -470,8 +487,12 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if messageFlag != "" {
-				body.Message = []byte(messageFlag)
+			if cmd.Flags().Changed("message") {
+				decoded, err := base64.StdEncoding.DecodeString(messageFlag)
+				if err != nil {
+					return fmt.Errorf("--message: invalid base64: %w", err)
+				}
+				body.Message = decoded
 			}
 			if cmd.Flags().Changed("signing-algorithm") {
 				body.SigningAlgorithm = (*kms.SigningAlgorithm)(&signingAlgorithmFlag)
@@ -513,11 +534,19 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
-			if messageFlag != "" {
-				body.Message = []byte(messageFlag)
+			if cmd.Flags().Changed("message") {
+				decoded, err := base64.StdEncoding.DecodeString(messageFlag)
+				if err != nil {
+					return fmt.Errorf("--message: invalid base64: %w", err)
+				}
+				body.Message = decoded
 			}
-			if signatureFlag != "" {
-				body.Signature = []byte(signatureFlag)
+			if cmd.Flags().Changed("signature") {
+				decoded, err := base64.StdEncoding.DecodeString(signatureFlag)
+				if err != nil {
+					return fmt.Errorf("--signature: invalid base64: %w", err)
+				}
+				body.Signature = decoded
 			}
 			if cmd.Flags().Changed("signing-algorithm") {
 				body.SigningAlgorithm = (*kms.SigningAlgorithm)(&signingAlgorithmFlag)

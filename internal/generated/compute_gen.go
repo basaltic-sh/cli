@@ -7,6 +7,7 @@
 package generated
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -570,8 +571,12 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			if userDataFlag != "" {
-				body.UserData = []byte(userDataFlag)
+			if cmd.Flags().Changed("user-data") {
+				decoded, err := base64.StdEncoding.DecodeString(userDataFlag)
+				if err != nil {
+					return fmt.Errorf("--user-data: invalid base64: %w", err)
+				}
+				body.UserData = decoded
 			}
 			if volumesFlag != "" {
 				if err := json.Unmarshal([]byte(volumesFlag), &body.Volumes); err != nil {
