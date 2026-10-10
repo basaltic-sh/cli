@@ -394,15 +394,32 @@ func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update",
 		Short: "Save organization billing details",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"city":              "city",
+				"company_name":      "company-name",
+				"complement":        "complement",
+				"country":           "country",
+				"customer_type":     "customer-type",
+				"email":             "email",
+				"foreign_tax_id":    "foreign-tax-id",
+				"missing_fields":    "missing-fields",
+				"municipality_code": "municipality-code",
+				"neighborhood":      "neighborhood",
+				"no_tax_id_reason":  "no-tax-id-reason",
+				"phone":             "phone",
+				"postal_code":       "postal-code",
+				"ready":             "ready",
+				"state":             "state",
+				"street_name":       "street-name",
+				"street_number":     "street-number",
+				"tax_id":            "tax-id",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := billingClient(state, "/v1/profile")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("city") {
 				body.City = &cityFlag

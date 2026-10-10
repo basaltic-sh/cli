@@ -245,3 +245,24 @@ binaries and `checksums.txt` are available on the
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).
+
+## Autoscaling and replacement capacity
+
+Set the bounds with the desired count when scaling a load balancer. Keep the
+maximum above the desired count to leave room for a replacement during a flavor
+roll. Omitting desired count from a bounds update lets the platform clamp the
+current value into the new range.
+
+```bash
+basaltic loadbalancer load-balancer update "$LOAD_BALANCER_ID" \
+  --min-count 2 --max-count 6 --desired-count 4
+basaltic compute instance-pool update "$POOL_ID" \
+  --min-count 1 --max-count 10 \
+  --autoscaling '{"enabled":true,"metrics":[{"source":"cpu","target_type":"utilization","target_value":60}]}'
+```
+
+CPU target tracking needs at least one member. The same `--autoscaling` policy
+shape works for load balancers and supports custom telemetry metrics. Set
+`enabled` to `false` to retain the policy while using manual sizing. Explicit
+zero and false values are preserved; omitted fields retain their API semantics.
+`--replica-count` remains the deprecated alias for load-balancer desired count.

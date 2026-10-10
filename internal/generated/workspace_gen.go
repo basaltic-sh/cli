@@ -136,15 +136,17 @@ func newWorkspaceAccountCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create account",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"handle":      "handle",
+				"name":        "name",
+			}, []string{"handle", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/accounts")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -165,9 +167,7 @@ func newWorkspaceAccountCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Handle, "handle", "", "Handle")
-	_ = cmd.MarkFlagRequired("handle")
 	f.StringVar(&body.Name, "name", "", "Name")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -182,15 +182,16 @@ func newWorkspaceAccountUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <account-id>",
 		Short: "Update account",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/accounts/{account_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -244,15 +245,17 @@ func newWorkspaceAccountAssignRoleAssignmentCommand(state *cli.State) *cobra.Com
 		Use:   "assign-role-assignment <account-id>",
 		Short: "Assign account role",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"principal_id":   "principal-id",
+				"principal_type": "principal-type",
+				"role_id":        "role-id",
+			}, []string{"principal_id", "principal_type", "role_id"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/accounts/{account_id}/role-assignments")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			out, err := c.AssignAccountRole(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -265,11 +268,8 @@ func newWorkspaceAccountAssignRoleAssignmentCommand(state *cli.State) *cobra.Com
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.PrincipalID, "principal-id", "", "Immutable UUID of a user or users-only group in this organization")
-	_ = cmd.MarkFlagRequired("principal-id")
 	f.StringVar(&body.PrincipalType, "principal-type", "", "Principal type (one of: user, group)")
-	_ = cmd.MarkFlagRequired("principal-type")
 	f.StringVar(&body.RoleID, "role-id", "", "Immutable UUID of a role owned by the target account")
-	_ = cmd.MarkFlagRequired("role-id")
 	return cmd
 }
 
@@ -469,15 +469,16 @@ func newWorkspaceGroupCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create group",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -498,7 +499,6 @@ func newWorkspaceGroupCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -512,15 +512,15 @@ func newWorkspaceGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <group-id>",
 		Short: "Update group",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/groups/{group_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -572,15 +572,15 @@ func newWorkspaceGroupAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Attach policy to group",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/groups/{group_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -597,7 +597,6 @@ func newWorkspaceGroupAttachPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -766,15 +765,15 @@ func newWorkspaceGroupSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Use:   "set-inline-policy <group-id> <policy-name>",
 		Short: "Create or replace a group's inline policy",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"document": "document",
+			}, []string{"document"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/groups/{group_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if documentFlag != "" {
 				if err := json.Unmarshal([]byte(documentFlag), &body.Document); err != nil {
@@ -792,7 +791,6 @@ func newWorkspaceGroupSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	return cmd
 }
 
@@ -974,15 +972,19 @@ func newWorkspaceOrganizationUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <organization-id>",
 		Short: "Update organization",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"captcha_token": "captcha-token",
+				"description":   "description",
+				"language":      "language",
+				"name":          "name",
+				"time_zone":     "time-zone",
+			}, []string{"captcha_token"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/organizations/{organization_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1007,7 +1009,6 @@ func newWorkspaceOrganizationUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.CaptchaToken, "captcha-token", "", "Google reCAPTCHA token for bot protection")
-	_ = cmd.MarkFlagRequired("captcha-token")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&languageFlag, "language", "", "Language for organization billing and operational emails, independent of each user's console preference (one of: en, pt-BR, es)")
 	f.StringVar(&nameFlag, "name", "", "Name")
@@ -1129,15 +1130,18 @@ func newWorkspacePolicyCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create policy",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"document":    "document",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"document", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1168,9 +1172,7 @@ func newWorkspacePolicyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -1187,15 +1189,17 @@ func newWorkspacePolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <policy-id>",
 		Short: "Update policy",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"document":    "document",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1408,15 +1412,15 @@ func newWorkspaceRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Attach policy to role",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy_id": "policy-id",
+			}, []string{"policy_id"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1433,7 +1437,6 @@ func newWorkspaceRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.PolicyID, "policy-id", "", "Immutable UUID of the organization policy to attach")
-	_ = cmd.MarkFlagRequired("policy-id")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1510,15 +1513,15 @@ func newWorkspaceServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Comm
 		Short: "Attach policy to service account",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy_id": "policy-id",
+			}, []string{"policy_id"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1535,7 +1538,6 @@ func newWorkspaceServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Comm
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.PolicyID, "policy-id", "", "Immutable UUID of the organization policy to attach")
-	_ = cmd.MarkFlagRequired("policy-id")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1687,15 +1689,17 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 		Short: "Add user to organization",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Add user to organization.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"email":  "email",
+				"groups": "groups",
+				"tags":   "tags",
+			}, []string{"email"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/users")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if groupsFlag != "" {
 				if err := json.Unmarshal([]byte(groupsFlag), &body.Groups); err != nil {
@@ -1722,7 +1726,6 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Email, "email", "", "Email of the user to add")
-	_ = cmd.MarkFlagRequired("email")
 	f.StringVar(&groupsFlag, "groups", "", "Groups to assign when the invitation is accepted (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -1739,15 +1742,15 @@ func newWorkspaceUserAddGroupCommand(state *cli.State) *cobra.Command {
 		Short: "Add user to group",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Add user to group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"group": "group",
+			}, []string{"group"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/users/{user_id}/groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1764,7 +1767,6 @@ func newWorkspaceUserAddGroupCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Group), "group", "", "Group")
-	_ = cmd.MarkFlagRequired("group")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1779,15 +1781,15 @@ func newWorkspaceUserAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Attach policy to user",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to user.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/users/{user_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1804,7 +1806,6 @@ func newWorkspaceUserAttachPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2057,15 +2058,15 @@ func newWorkspaceUserSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Use:   "set-inline-policy <user-id> <policy-name>",
 		Short: "Create or replace a user's inline policy",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"document": "document",
+			}, []string{"document"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/users/{user_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if documentFlag != "" {
 				if err := json.Unmarshal([]byte(documentFlag), &body.Document); err != nil {
@@ -2083,7 +2084,6 @@ func newWorkspaceUserSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	return cmd
 }
 
@@ -2095,15 +2095,15 @@ func newWorkspaceUserSetPermissionBoundaryCommand(state *cli.State) *cobra.Comma
 		Use:   "set-permission-boundary <user-id>",
 		Short: "Set a user's permission boundary",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := workspaceClient(state, "/v1/users/{user_id}/permission-boundary")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if err := c.SetUserPermissionBoundary(cmd.Context(), args[0], &body); err != nil {
 				return err
@@ -2116,6 +2116,5 @@ func newWorkspaceUserSetPermissionBoundaryCommand(state *cli.State) *cobra.Comma
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }

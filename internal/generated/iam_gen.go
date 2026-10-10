@@ -101,15 +101,20 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 		Use:   "authorize",
 		Short: "Approve a CLI login and issue an authorization code",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"client_id":             "client-id",
+				"code_challenge":        "code-challenge",
+				"code_challenge_method": "code-challenge-method",
+				"organization":          "organization",
+				"redirect_uri":          "redirect-uri",
+				"state":                 "state",
+			}, []string{"client_id", "code_challenge", "code_challenge_method", "organization", "redirect_uri"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/oauth/authorize")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("state") {
 				body.State = &stateFlag
@@ -125,15 +130,10 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.ClientID, "client-id", "", "The registered client being approved")
-	_ = cmd.MarkFlagRequired("client-id")
 	f.StringVar(&body.CodeChallenge, "code-challenge", "", "Base64url SHA-256 of the client's PKCE verifier, without padding")
-	_ = cmd.MarkFlagRequired("code-challenge")
 	f.StringVar(&body.CodeChallengeMethod, "code-challenge-method", "", "S256 only (one of: S256)")
-	_ = cmd.MarkFlagRequired("code-challenge-method")
 	f.StringVar((*string)(&body.Organization), "organization", "", "Organization")
-	_ = cmd.MarkFlagRequired("organization")
 	f.StringVar(&body.RedirectURI, "redirect-uri", "", "For the CLI this must be urn:ietf:wg:oauth:2.0:oob — the out-of-band pseudo-redirect, meaning the code is DISPLAYED rather than delivered anywhere")
-	_ = cmd.MarkFlagRequired("redirect-uri")
 	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
 	return cmd
 }
@@ -227,15 +227,18 @@ func newIamPolicyCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create policy",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"document":    "document",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"document", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -266,9 +269,7 @@ func newIamPolicyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -285,15 +286,17 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <policy-id>",
 		Short: "Update policy",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"document":    "document",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/policies/{policy_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -551,15 +554,18 @@ func newIamRoleCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create role",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":  "description",
+				"name":         "name",
+				"tags":         "tags",
+				"trust_policy": "trust-policy",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/roles")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -590,7 +596,6 @@ func newIamRoleCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&trustPolicyFlag, "trust-policy", "", "Trust policy (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -608,15 +613,17 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <role-id>",
 		Short: "Update role",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":  "description",
+				"tags":         "tags",
+				"trust_policy": "trust-policy",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/roles/{role_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -680,15 +687,17 @@ func newIamRoleAssumeCommand(state *cli.State) *cobra.Command {
 		Use:   "assume",
 		Short: "Assume role",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"duration_seconds": "duration-seconds",
+				"policy":           "policy",
+				"role":             "role",
+			}, []string{"role"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/assume-role")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("duration-seconds") {
 				body.DurationSeconds = &durationSecondsFlag
@@ -711,7 +720,6 @@ func newIamRoleAssumeCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Credential validity duration (15 min to 12 hours)")
 	f.StringVar(&policyFlag, "policy", "", "Policy (JSON)")
 	f.StringVar((*string)(&body.Role), "role", "", "Role")
-	_ = cmd.MarkFlagRequired("role")
 	return cmd
 }
 
@@ -725,15 +733,19 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 		Use:   "assume-with-web-identity",
 		Short: "Assume role with web identity",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"account":            "account",
+				"duration_seconds":   "duration-seconds",
+				"role":               "role",
+				"session_name":       "session-name",
+				"web_identity_token": "web-identity-token",
+			}, []string{"account", "role", "web_identity_token"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/assume-role-with-web-identity")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("duration-seconds") {
 				body.DurationSeconds = &durationSecondsFlag
@@ -752,13 +764,10 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Account), "account", "", "Account")
-	_ = cmd.MarkFlagRequired("account")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Credential validity duration (15 min to 12 hours)")
 	f.StringVar((*string)(&body.Role), "role", "", "Role")
-	_ = cmd.MarkFlagRequired("role")
 	f.StringVar(&sessionNameFlag, "session-name", "", "A label recorded on the session and in the audit trail")
 	f.StringVar(&body.WebIdentityToken, "web-identity-token", "", "The identity token to exchange, as a signed JWT")
-	_ = cmd.MarkFlagRequired("web-identity-token")
 	return cmd
 }
 
@@ -772,15 +781,15 @@ func newIamRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Attach policy to role",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to role.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/roles/{role_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -797,7 +806,6 @@ func newIamRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -978,15 +986,15 @@ func newIamRoleSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 		Use:   "set-inline-policy <role-id> <policy-name>",
 		Short: "Create or replace a role's inline policy",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"document": "document",
+			}, []string{"document"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/roles/{role_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if documentFlag != "" {
 				if err := json.Unmarshal([]byte(documentFlag), &body.Document); err != nil {
@@ -1004,7 +1012,6 @@ func newIamRoleSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	return cmd
 }
 
@@ -1016,15 +1023,15 @@ func newIamRoleSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 		Use:   "set-permission-boundary <role-id>",
 		Short: "Set a role's permission boundary",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/roles/{role_id}/permission-boundary")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if err := c.SetRolePermissionBoundary(cmd.Context(), args[0], &body); err != nil {
 				return err
@@ -1037,7 +1044,6 @@ func newIamRoleSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }
 
@@ -1144,15 +1150,17 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create service account",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1178,7 +1186,6 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Immutable account-scoped name")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -1195,15 +1202,17 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <service-account-id>",
 		Short: "Update service account",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"enabled":     "enabled",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1265,15 +1274,15 @@ func newIamServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Command {
 		Short: "Attach policy to service account",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach policy to service account.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1290,7 +1299,6 @@ func newIamServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1304,15 +1312,16 @@ func newIamServiceAccountCreateCredentialCommand(state *cli.State) *cobra.Comman
 		Use:   "create-credential <service-account-id>",
 		Short: "Create credential",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"expires_at": "expires-at",
+				"name":       "name",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/credentials")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if expiresAtFlag != "" {
 				parsed, err := parseTime(expiresAtFlag)
@@ -1333,7 +1342,6 @@ func newIamServiceAccountCreateCredentialCommand(state *cli.State) *cobra.Comman
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&expiresAtFlag, "expires-at", "", "Optional expiration date (RFC 3339)")
 	f.StringVar(&body.Name, "name", "", "Name")
-	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
 
@@ -1346,15 +1354,17 @@ func newIamServiceAccountCreateSshKeyCommand(state *cli.State) *cobra.Command {
 		Use:   "create-ssh-key <service-account-id>",
 		Short: "Add service-account SSH key",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"expires_at": "expires-at",
+				"name":       "name",
+				"public_key": "public-key",
+			}, []string{"name", "public_key"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/ssh-keys")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if expiresAtFlag != "" {
 				parsed, err := parseTime(expiresAtFlag)
@@ -1375,9 +1385,7 @@ func newIamServiceAccountCreateSshKeyCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&expiresAtFlag, "expires-at", "", "Optional expiry at least one minute in the future (RFC 3339)")
 	f.StringVar(&body.Name, "name", "", "Name")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&body.PublicKey, "public-key", "", "One OpenSSH public key")
-	_ = cmd.MarkFlagRequired("public-key")
 	return cmd
 }
 
@@ -1675,15 +1683,15 @@ func newIamServiceAccountSetInlinePolicyCommand(state *cli.State) *cobra.Command
 		Use:   "set-inline-policy <service-account-id> <policy-name>",
 		Short: "Create or replace a service account's inline policy",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"document": "document",
+			}, []string{"document"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/inline-policies/{policy_name}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if documentFlag != "" {
 				if err := json.Unmarshal([]byte(documentFlag), &body.Document); err != nil {
@@ -1701,7 +1709,6 @@ func newIamServiceAccountSetInlinePolicyCommand(state *cli.State) *cobra.Command
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	return cmd
 }
 
@@ -1713,15 +1720,15 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 		Use:   "set-permission-boundary <service-account-id>",
 		Short: "Set a service account's permission boundary",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"policy": "policy",
+			}, []string{"policy"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/service-accounts/{service_account_id}/permission-boundary")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if err := c.SetServiceAccountPermissionBoundary(cmd.Context(), args[0], &body); err != nil {
 				return err
@@ -1734,7 +1741,6 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar((*string)(&body.Policy), "policy", "", "Policy")
-	_ = cmd.MarkFlagRequired("policy")
 	return cmd
 }
 
@@ -1783,15 +1789,17 @@ func newIamSshKeyCreateCommand(state *cli.State) *cobra.Command {
 		Use:   "create",
 		Short: "Add personal SSH key",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"expires_at": "expires-at",
+				"name":       "name",
+				"public_key": "public-key",
+			}, []string{"name", "public_key"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/auth/ssh-keys")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if expiresAtFlag != "" {
 				parsed, err := parseTime(expiresAtFlag)
@@ -1812,9 +1820,7 @@ func newIamSshKeyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&expiresAtFlag, "expires-at", "", "Optional expiry at least one minute in the future (RFC 3339)")
 	f.StringVar(&body.Name, "name", "", "Name")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&body.PublicKey, "public-key", "", "One OpenSSH public key")
-	_ = cmd.MarkFlagRequired("public-key")
 	return cmd
 }
 
@@ -1932,15 +1938,15 @@ func newIamStsSessionRevokeCommand(state *cli.State) *cobra.Command {
 		Use:   "revoke <session-id>",
 		Short: "Revoke STS session",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"reason": "reason",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/sts-sessions/{session_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("reason") {
 				body.Reason = &reasonFlag
@@ -1986,15 +1992,22 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 		Use:   "create",
 		Short: "Exchange an access key for a bearer token",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"client_id":        "client-id",
+				"client_secret":    "client-secret",
+				"code":             "code",
+				"code_verifier":    "code-verifier",
+				"duration_seconds": "duration-seconds",
+				"grant_type":       "grant-type",
+				"redirect_uri":     "redirect-uri",
+				"refresh_token":    "refresh-token",
+			}, []string{"grant_type"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/oauth/token")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("client-id") {
 				body.ClientID = &clientIdFlag
@@ -2033,7 +2046,6 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&codeVerifierFlag, "code-verifier", "", "The PKCE verifier whose SHA-256 was sent as code_challenge when the flow started (RFC 7636)")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Requested token lifetime")
 	f.StringVar(&body.GrantType, "grant-type", "", "client_credentials is the one to use for a service account: it exchanges an access key pair for a token, and needs nothing else (one of: client_credentials, authorization_code, refresh_token)")
-	_ = cmd.MarkFlagRequired("grant-type")
 	f.StringVar(&redirectUriFlag, "redirect-uri", "", "The same redirect_uri the code was issued for — for the CLI, urn:ietf:wg:oauth:2.0:oob")
 	f.StringVar(&refreshTokenFlag, "refresh-token", "", "refresh_token grant only")
 	return cmd
@@ -2048,15 +2060,16 @@ func newIamTokenRevokeCommand(state *cli.State) *cobra.Command {
 		Use:   "revoke",
 		Short: "Revoke a bearer token",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"token":           "token",
+				"token_type_hint": "token-type-hint",
+			}, []string{"token"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/oauth/revoke")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("token-type-hint") {
 				body.TokenTypeHint = &tokenTypeHintFlag
@@ -2072,7 +2085,6 @@ func newIamTokenRevokeCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Token, "token", "", "The access token to revoke")
-	_ = cmd.MarkFlagRequired("token")
 	f.StringVar(&tokenTypeHintFlag, "token-type-hint", "", "Accepted and ignored — the token identifies itself")
 	return cmd
 }

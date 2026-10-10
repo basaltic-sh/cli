@@ -132,15 +132,18 @@ func newDnsRecordCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create record",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create record.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"name":   "name",
+				"ttl":    "ttl",
+				"type":   "type",
+				"values": "values",
+			}, []string{"name", "type", "values"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones/{zone_id}/records")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("ttl") {
 				body.TTL = &ttlFlag
@@ -165,12 +168,9 @@ func newDnsRecordCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Name, "name", "", "Record name (FQDN)")
-	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&ttlFlag, "ttl", 0, "Ttl")
 	f.StringVar((*string)(&body.Type), "type", "", "Type (one of: A, AAAA, AFSDB, APL, CAA, CERT, CNAME, CSYNC, DHCID, DNAME, EUI48, EUI64, HINFO, HTTPS, IPSECKEY, KX, L32, L64, LOC, LP, MX, NAPTR, NID, NS, OPENPGPKEY, PTR, RKEY, RP, SMIMEA, SPF, SRV, SSHFP, SVCB, TLSA, TXT, URI)")
-	_ = cmd.MarkFlagRequired("type")
 	f.StringVar(&valuesFlag, "values", "", "Values (JSON)")
-	_ = cmd.MarkFlagRequired("values")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -185,15 +185,16 @@ func newDnsRecordUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <zone-id> <record-id>",
 		Short: "Update record",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"ttl":    "ttl",
+				"values": "values",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones/{zone_id}/records/{record_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("ttl") {
 				body.TTL = &ttlFlag
@@ -338,15 +339,21 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create zone",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create zone.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":             "description",
+				"dnssec":                  "dnssec",
+				"import_existing_records": "import-existing-records",
+				"name":                    "name",
+				"tags":                    "tags",
+				"visibility":              "visibility",
+				"vpcs":                    "vpcs",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -383,7 +390,6 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&dnssecFlag, "dnssec", false, "Sign the zone with DNSSEC")
 	f.BoolVar(&importExistingRecordsFlag, "import-existing-records", false, "Read the domain's records from the nameservers that serve it TODAY and copy them into this zone, before you move the delegation here")
 	f.StringVar(&body.Name, "name", "", "Zone FQDN")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&visibilityFlag, "visibility", "", "private restricts the zone to the VPCs named in vpcs and requires at least one; public (the default) rejects vpcs outright rather than ignoring them (one of: public, private)")
 	f.StringSliceVar(&body.VPCs, "vpcs", nil, "Account-owned VPC UUIDs or network/vpc CRNs the zone resolves in")
@@ -401,15 +407,16 @@ func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <zone-id>",
 		Short: "Update zone",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones/{zone_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -467,15 +474,15 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 		Short: "Associate a VPC with a private zone",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Associate a VPC with a private zone.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"vpc": "vpc",
+			}, []string{"vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones/{zone_id}/vpc-associations")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -492,7 +499,6 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.VPC, "vpc", "", "Account-owned VPC UUID or network/vpc CRN to associate with this private zone")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -599,15 +605,15 @@ func newDnsZoneImportCommand(state *cli.State) *cobra.Command {
 		Short: "Import a zone file",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Import a zone file.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"zone_file": "zone-file",
+			}, []string{"zone_file"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := dnsClient(state, "/v1/zones/{zone_id}/import")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -624,7 +630,6 @@ func newDnsZoneImportCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.ZoneFile, "zone-file", "", "The zone file, as text")
-	_ = cmd.MarkFlagRequired("zone-file")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

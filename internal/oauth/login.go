@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/basaltic-sh/cli/internal/config"
 	"io"
 	"net/http"
 	"net/url"
@@ -208,6 +209,9 @@ func post(ctx context.Context, client *http.Client, endpoint string, form url.Va
 			// the server deliberately does not say which — telling them apart
 			// would tell a holder of a stolen code which half they got wrong.
 			if e.Error == "invalid_grant" {
+				if form.Get("grant_type") == "refresh_token" {
+					return nil, config.ErrSessionExpired
+				}
 				return nil, errors.New("that code was not accepted; it may have expired, been used already, or been mistyped. Run the command again")
 			}
 			if e.ErrorDescription != "" {

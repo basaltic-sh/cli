@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"github.com/basaltic-sh/cli/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -157,5 +159,17 @@ func TestSupportsInteractiveLogin(t *testing.T) {
 		if got := tc.m.SupportsInteractiveLogin(); got != tc.want {
 			t.Errorf("%s: got %v want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestRejectedRefreshIsClassifiedAsExpired(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":"invalid_grant"}`)
+	}))
+	defer server.Close()
+	_, err := Refresh(context.Background(), server.Client(), server.URL, "test-refresh")
+	if !errors.Is(err, config.ErrSessionExpired) {
+		t.Fatalf("revocation not classified: %v", err)
 	}
 }

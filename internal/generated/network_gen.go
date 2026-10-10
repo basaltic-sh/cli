@@ -138,15 +138,18 @@ func newNetworkEgressOnlyGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create egress-only gateway",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create egress-only gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+				"vpc":         "vpc",
+			}, []string{"name", "vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/egress-only-gateways")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -172,10 +175,8 @@ func newNetworkEgressOnlyGatewayCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -190,15 +191,16 @@ func newNetworkEgressOnlyGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <egress-only-gateway-id>",
 		Short: "Update egress-only gateway",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/egress-only-gateways/{egress_only_gateway_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -374,15 +376,20 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Allocate floating IP",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Allocate floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":  "description",
+				"family":       "family",
+				"health_check": "health-check",
+				"subnet":       "subnet",
+				"tags":         "tags",
+				"visibility":   "visibility",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/floating-ips")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -441,15 +448,17 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <floating-ip-id>",
 		Short: "Update floating IP",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":  "description",
+				"health_check": "health-check",
+				"tags":         "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -513,15 +522,16 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 		Short: "Attach a floating IP to an interface",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a floating IP to an interface.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"address_id": "address-id",
+				"interface":  "interface",
+			}, []string{"address_id", "interface"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/attach")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -538,9 +548,7 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.AddressID, "address-id", "", "Address id")
-	_ = cmd.MarkFlagRequired("address-id")
 	f.StringVar(&body.Interface, "interface", "", "Interface UUID or nested CRN")
-	_ = cmd.MarkFlagRequired("interface")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -556,15 +564,15 @@ func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
 		Short: "Detach a floating IP",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Detach a floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"interface": "interface",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/detach")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("interface") {
 				body.Interface = &interfaceFlag
@@ -689,15 +697,20 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create interface",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create interface.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"addresses":   "addresses",
+				"description": "description",
+				"mac":         "mac",
+				"name":        "name",
+				"subnet":      "subnet",
+				"tags":        "tags",
+			}, []string{"name", "subnet"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if addressesFlag != "" {
 				if err := json.Unmarshal([]byte(addressesFlag), &body.Addresses); err != nil {
@@ -733,9 +746,7 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&macFlag, "mac", "", "Defaults to a fresh locally-administered EUI-48")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&body.Subnet, "subnet", "", "Subnet UUID or nested CRN (vpc/<vpc>/subnet/<subnet>)")
-	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -751,15 +762,16 @@ func newNetworkInterfaceUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <interface-id>",
 		Short: "Update interface",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -816,15 +828,16 @@ func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 		Use:   "create-address <interface-id>",
 		Short: "Create interface address",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"address": "address",
+				"family":  "family",
+			}, []string{"family"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}/addresses")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("address") {
 				body.Address = &addressFlag
@@ -841,7 +854,6 @@ func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&addressFlag, "address", "", "Optional fixed address when creating an interface or instance NIC")
 	f.StringVar(&body.Family, "family", "", "Family (one of: ipv4, ipv6)")
-	_ = cmd.MarkFlagRequired("family")
 	return cmd
 }
 
@@ -853,15 +865,15 @@ func newNetworkInterfaceCreatePrefixCommand(state *cli.State) *cobra.Command {
 		Use:   "create-prefix <interface-id>",
 		Short: "Create interface prefix",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"pool_id": "pool-id",
+			}, []string{"pool_id"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}/prefixes")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			out, err := c.CreateInterfacePrefix(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -874,7 +886,6 @@ func newNetworkInterfaceCreatePrefixCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.PoolID, "pool-id", "", "Pool id")
-	_ = cmd.MarkFlagRequired("pool-id")
 	return cmd
 }
 
@@ -1027,15 +1038,15 @@ func newNetworkInterfaceSetSecurityGroupCommand(state *cli.State) *cobra.Command
 		Use:   "set-security-group <interface-id>",
 		Short: "Set interface security-group membership",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"security_groups": "security-groups",
+			}, []string{"security_groups"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			page, err := c.SetInterfaceSecurityGroups(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -1048,7 +1059,6 @@ func newNetworkInterfaceSetSecurityGroupCommand(state *cli.State) *cobra.Command
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security-group UUIDs, CRNs or account-scoped names")
-	_ = cmd.MarkFlagRequired("security-groups")
 	return cmd
 }
 
@@ -1141,15 +1151,17 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create internet gateway",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create internet gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/internet-gateways")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1175,7 +1187,6 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -1191,15 +1202,16 @@ func newNetworkInternetGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <internet-gateway-id>",
 		Short: "Update internet gateway",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1257,15 +1269,15 @@ func newNetworkInternetGatewayAttachCommand(state *cli.State) *cobra.Command {
 		Short: "Attach internet gateway to a VPC",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach internet gateway to a VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"vpc": "vpc",
+			}, []string{"vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/attach")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1282,7 +1294,6 @@ func newNetworkInternetGatewayAttachCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1442,15 +1453,18 @@ func newNetworkNatGatewayCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create NAT gateway",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create NAT gateway.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"subnet":      "subnet",
+				"tags":        "tags",
+			}, []string{"name", "subnet"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/nat-gateways")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1476,9 +1490,7 @@ func newNetworkNatGatewayCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&body.Subnet, "subnet", "", "Subnet UUID or nested CRN (vpc/<vpc>/subnet/<subnet>)")
-	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -1494,15 +1506,16 @@ func newNetworkNatGatewayUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <nat-gateway-id>",
 		Short: "Update NAT gateway",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/nat-gateways/{nat_gateway_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1674,15 +1687,21 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create route",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create route.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":                "description",
+				"destination_cidr":           "destination-cidr",
+				"next_hop_ip":                "next-hop-ip",
+				"tags":                       "tags",
+				"target_egress_only_gateway": "target-egress-only-gateway",
+				"target_internet_gateway":    "target-internet-gateway",
+				"target_nat_gateway":         "target-nat-gateway",
+			}, []string{"destination_cidr"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1720,7 +1739,6 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.DestinationCIDR, "destination-cidr", "", "Destination cidr")
-	_ = cmd.MarkFlagRequired("destination-cidr")
 	f.StringVar(&nextHopIpFlag, "next-hop-ip", "", "Unicast next hop inside this VPC's CIDR (same IP family as destination_cidr)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&targetEgressOnlyGatewayFlag, "target-egress-only-gateway", "", "Gateway UUID, CRN or exact account-scoped name")
@@ -1740,15 +1758,16 @@ func newNetworkRouteUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <route-table-id> <route-id>",
 		Short: "Update route",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/route-tables/{route_table_id}/routes/{route_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1884,15 +1903,18 @@ func newNetworkRouteTableCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create route table",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create route table.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+				"vpc":         "vpc",
+			}, []string{"name", "vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/route-tables")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1918,10 +1940,8 @@ func newNetworkRouteTableCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "1-63 chars, lowercase alphanumeric + hyphen")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1936,15 +1956,16 @@ func newNetworkRouteTableUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <route-table-id>",
 		Short: "Update route table",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/route-tables/{route_table_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -2078,15 +2099,17 @@ func newNetworkSecurityGroupCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create security group",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create security group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/security-groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -2112,7 +2135,6 @@ func newNetworkSecurityGroupCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -2128,15 +2150,16 @@ func newNetworkSecurityGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <security-group-id>",
 		Short: "Update security group",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/security-groups/{security_group_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -2273,15 +2296,22 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create security group rule",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create security group rule.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":           "description",
+				"direction":             "direction",
+				"ethertype":             "ethertype",
+				"port_max":              "port-max",
+				"port_min":              "port-min",
+				"protocol":              "protocol",
+				"remote_cidr":           "remote-cidr",
+				"source_security_group": "source-security-group",
+			}, []string{"direction", "protocol"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/security-groups/{security_group_id}/rules")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -2317,12 +2347,10 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar((*string)(&body.Direction), "direction", "", "Direction (one of: ingress, egress)")
-	_ = cmd.MarkFlagRequired("direction")
 	f.StringVar(&ethertypeFlag, "ethertype", "", "Ethertype (one of: ipv4, ipv6)")
 	f.IntVar(&portMaxFlag, "port-max", 0, "Port max")
 	f.IntVar(&portMinFlag, "port-min", 0, "Port min")
 	f.StringVar((*string)(&body.Protocol), "protocol", "", "Protocol (one of: tcp, udp, icmp, all)")
-	_ = cmd.MarkFlagRequired("protocol")
 	f.StringVar(&remoteCidrFlag, "remote-cidr", "", "Remote cidr")
 	f.StringVar(&sourceSecurityGroupFlag, "source-security-group", "", "Security-group UUID, CRN or exact account-scoped name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -2444,15 +2472,23 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create subnet",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create subnet.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"allocate_cidr_ipv6": "allocate-cidr-ipv6",
+				"cidr_ipv4":          "cidr-ipv4",
+				"cidr_ipv6":          "cidr-ipv6",
+				"description":        "description",
+				"gateway_ipv4":       "gateway-ipv4",
+				"name":               "name",
+				"route_table":        "route-table",
+				"tags":               "tags",
+				"vpc":                "vpc",
+			}, []string{"cidr_ipv4", "name", "vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/subnets")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("allocate-cidr-ipv6") {
 				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
@@ -2490,16 +2526,13 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a free /64 from the VPC IPv6 range")
 	f.StringVar(&body.CIDRIPv4, "cidr-ipv4", "", "Cidr ipv4")
-	_ = cmd.MarkFlagRequired("cidr-ipv4")
 	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "An aligned /64 inside the VPC IPv6 range")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&gatewayIPv4Flag, "gateway-ipv4", "", "Defaults to the first usable host in the CIDR")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&routeTableFlag, "route-table", "", "Route-table UUID, nested CRN or exact name within the subnet VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -2519,15 +2552,21 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <subnet-id>",
 		Short: "Update subnet",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"allocate_cidr_ipv6":       "allocate-cidr-ipv6",
+				"cidr_ipv6":                "cidr-ipv6",
+				"copy_ipv4_security_rules": "copy-ipv4-security-rules",
+				"description":              "description",
+				"ipv6_routing":             "ipv6-routing",
+				"route_table":              "route-table",
+				"tags":                     "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/subnets/{subnet_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("allocate-cidr-ipv6") {
 				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
@@ -2686,15 +2725,20 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create VPC",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"allocate_cidr_ipv6": "allocate-cidr-ipv6",
+				"cidr_ipv4":          "cidr-ipv4",
+				"cidr_ipv6":          "cidr-ipv6",
+				"description":        "description",
+				"name":               "name",
+				"tags":               "tags",
+			}, []string{"cidr_ipv4", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/vpcs")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("allocate-cidr-ipv6") {
 				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
@@ -2726,11 +2770,9 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a regional GUA /60")
 	f.StringVar(&body.CIDRIPv4, "cidr-ipv4", "", "Must be private (RFC 1918): within 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16")
-	_ = cmd.MarkFlagRequired("cidr-ipv4")
 	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "Optional aligned locally assigned ULA (fd00::/8), /48 through /60")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -2748,15 +2790,18 @@ func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <vpc-id>",
 		Short: "Update VPC",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"allocate_cidr_ipv6": "allocate-cidr-ipv6",
+				"cidr_ipv6":          "cidr-ipv6",
+				"description":        "description",
+				"tags":               "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/vpcs/{vpc_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("allocate-cidr-ipv6") {
 				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
@@ -2820,15 +2865,15 @@ func newNetworkVpcCreatePrefixPoolCommand(state *cli.State) *cobra.Command {
 		Use:   "create-prefix-pool <vpc-id>",
 		Short: "Create prefix pool",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"cidr_ipv4": "cidr-ipv4",
+			}, []string{"cidr_ipv4"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			out, err := c.CreatePrefixPool(cmd.Context(), args[0], &body)
 			if err != nil {
@@ -2841,7 +2886,6 @@ func newNetworkVpcCreatePrefixPoolCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.CIDRIPv4, "cidr-ipv4", "", "Cidr ipv4")
-	_ = cmd.MarkFlagRequired("cidr-ipv4")
 	return cmd
 }
 

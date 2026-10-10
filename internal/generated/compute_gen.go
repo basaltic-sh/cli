@@ -212,15 +212,27 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Import an image from an object URL",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Import an image from an object URL.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"architecture": "architecture",
+				"attributes":   "attributes",
+				"current":      "current",
+				"description":  "description",
+				"eol_date":     "eol-date",
+				"min_disk_gb":  "min-disk-gb",
+				"min_ram_mb":   "min-ram-mb",
+				"name":         "name",
+				"os":           "os",
+				"os_version":   "os-version",
+				"source_url":   "source-url",
+				"tags":         "tags",
+				"version":      "version",
+			}, []string{"name", "source_url"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/images")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("architecture") {
 				body.Architecture = &architectureFlag
@@ -281,11 +293,9 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&minDiskGbFlag, "min-disk-gb", 0, "Min disk gb")
 	f.IntVar(&minRammbFlag, "min-ram-mb", 0, "Min ram mb")
 	f.StringVar(&body.Name, "name", "", "Immutable image name (e.g")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&osFlag, "os", "", "Operating system distribution (one of: almalinux, alpine, arch, centos, debian, fedora, opensuse, rhel, rocky, ubuntu, linux)")
 	f.StringVar(&osVersionFlag, "os-version", "", "Os version")
 	f.StringVar(&body.SourceURL, "source-url", "", "Presigned https GET URL to the disk in an object store you control")
-	_ = cmd.MarkFlagRequired("source-url")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&versionFlag, "version", "", "Identifies this build within name, and must be unique there — re-publishing a version that a tag already carries is a 409")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -305,15 +315,19 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <image-id>",
 		Short: "Update an image's metadata",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"attributes":  "attributes",
+				"current":     "current",
+				"description": "description",
+				"eol_date":    "eol-date",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/images/{image_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if attributesFlag != "" {
 				if err := json.Unmarshal([]byte(attributesFlag), &body.Attributes); err != nil {
@@ -534,15 +548,25 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create instance",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"architecture": "architecture",
+				"description":  "description",
+				"flavor":       "flavor",
+				"iam_role":     "iam-role",
+				"image":        "image",
+				"metadata":     "metadata",
+				"name":         "name",
+				"networks":     "networks",
+				"tags":         "tags",
+				"user_data":    "user-data",
+				"volumes":      "volumes",
+			}, []string{"flavor", "name", "networks"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("architecture") {
 				body.Architecture = &architectureFlag
@@ -600,14 +624,11 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&architectureFlag, "architecture", "", "Architecture for image names and name:version tags (default amd64); a CRN pins its own architecture and version")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name)")
-	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&iamRoleFlag, "iam-role", "", "Attach an IAM role from the same account by UUID, CRN or exact name")
 	f.StringVar(&imageFlag, "image", "", "Image to clone the boot disk from")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&networksFlag, "networks", "", "Interfaces to attach, at least one (JSON)")
-	_ = cmd.MarkFlagRequired("networks")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&userDataFlag, "user-data", "", "Base64-encoded user data (cloud-init)")
 	f.StringVar(&volumesFlag, "volumes", "", "New or existing disks bound with the instance, the boot disk included — mark it with boot: true (JSON)")
@@ -627,15 +648,18 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <instance-id>",
 		Short: "Update instance",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"iam_role":    "iam-role",
+				"metadata":    "metadata",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -703,15 +727,15 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 		Short: "Attach an existing NIC to an instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach an existing NIC to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"interface": "interface",
+			}, []string{"interface"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/nics")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -728,7 +752,6 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Interface, "interface", "", "Existing standalone interface UUID or complete VPC/subnet/interface CRN")
-	_ = cmd.MarkFlagRequired("interface")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -746,15 +769,18 @@ func newComputeInstanceAttachVolumeCommand(state *cli.State) *cobra.Command {
 		Short: "Attach a data volume to an instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a data volume to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"device":     "device",
+				"fstype":     "fstype",
+				"mount_path": "mount-path",
+				"volume":     "volume",
+			}, []string{"volume"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("device") {
 				body.Device = &deviceFlag
@@ -783,7 +809,6 @@ func newComputeInstanceAttachVolumeCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&fstypeFlag, "fstype", "", "Filesystem the in-guest agent formats the disk with, and only when mount_path is set and the disk is blank (one of: ext4, xfs)")
 	f.StringVar(&mountPathFlag, "mount-path", "", "When set, the in-guest agent formats the disk (only if blank) and mounts it at this path")
 	f.StringVar(&body.Volume, "volume", "", "Account-scoped volume reference (UUID, CRN or exact name)")
-	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -968,15 +993,15 @@ func newComputeInstanceRebootCommand(state *cli.State) *cobra.Command {
 		Short: "Reboot instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Reboot instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"hard": "hard",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/reboot")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("hard") {
 				body.Hard = &hardFlag
@@ -1013,15 +1038,17 @@ func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 		Short: "Reinstall instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Reinstall instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"image":       "image",
+				"size_gb":     "size-gb",
+				"volume_type": "volume-type",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/reinstall")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("image") {
 				body.Image = &imageFlag
@@ -1063,15 +1090,15 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 		Short: "Resize instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Resize instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"flavor": "flavor",
+			}, []string{"flavor"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/resize")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1088,7 +1115,6 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Flavor, "flavor", "", "Regional flavor reference (UUID, CRN or exact name) to resize to")
-	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1161,15 +1187,15 @@ func newComputeInstanceUpdateVolumeCommand(state *cli.State) *cobra.Command {
 		Use:   "update-volume <instance-id> <volume-id>",
 		Short: "Update a volume attachment's settings",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"delete_on_termination": "delete-on-termination",
+			}, []string{"delete_on_termination"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instances/{instance_id}/volumes/{volume_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if err := c.UpdateInstanceVolumeAttachment(cmd.Context(), args[0], args[1], &body); err != nil {
 				return err
@@ -1182,7 +1208,6 @@ func newComputeInstanceUpdateVolumeCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&body.DeleteOnTermination, "delete-on-termination", false, "Delete on termination")
-	_ = cmd.MarkFlagRequired("delete-on-termination")
 	return cmd
 }
 
@@ -1269,6 +1294,7 @@ func newComputeInstancePoolGetCommand(state *cli.State) *cobra.Command {
 func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstancePoolCreateRequest
 	var bodyFile string
+	var autoscalingFlag string
 	var descriptionFlag string
 	var desiredCountFlag int
 	var maxCountFlag int
@@ -1281,14 +1307,26 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create an instance pool",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create an instance pool.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"autoscaling":   "autoscaling",
+				"description":   "description",
+				"desired_count": "desired-count",
+				"max_count":     "max-count",
+				"min_count":     "min-count",
+				"name":          "name",
+				"tags":          "tags",
+				"template":      "template",
+			}, []string{"name", "template"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instance-pools")
 			if err != nil {
 				return err
 			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
+			if autoscalingFlag != "" {
+				if err := json.Unmarshal([]byte(autoscalingFlag), &body.Autoscaling); err != nil {
+					return fmt.Errorf("--autoscaling: %w", err)
 				}
 			}
 			if cmd.Flags().Changed("description") {
@@ -1327,15 +1365,14 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&autoscalingFlag, "autoscaling", "", "Autoscaling (JSON)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "Desired count")
 	f.IntVar(&maxCountFlag, "max-count", 0, "A value of 0 means the pool holds no members until max_count is raised")
 	f.IntVar(&minCountFlag, "min-count", 0, "Min count")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Labels on the pool resource, for IAM conditions (basalt:RequestTag/<key> here, basalt:ResourceTag/<key> on later operations) and cost attribution (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Template (JSON)")
-	_ = cmd.MarkFlagRequired("template")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1344,6 +1381,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	var body compute.InstancePoolUpdateRequest
 	var bodyFile string
+	var autoscalingFlag string
 	var descriptionFlag string
 	var desiredCountFlag int
 	var maxCountFlag int
@@ -1354,14 +1392,25 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <pool-id>",
 		Short: "Update an instance pool's description, size, tags or launch template",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"autoscaling":   "autoscaling",
+				"description":   "description",
+				"desired_count": "desired-count",
+				"max_count":     "max-count",
+				"min_count":     "min-count",
+				"tags":          "tags",
+				"template":      "template",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instance-pools/{pool_id}")
 			if err != nil {
 				return err
 			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
+			if autoscalingFlag != "" {
+				if err := json.Unmarshal([]byte(autoscalingFlag), &body.Autoscaling); err != nil {
+					return fmt.Errorf("--autoscaling: %w", err)
 				}
 			}
 			if cmd.Flags().Changed("description") {
@@ -1396,6 +1445,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&autoscalingFlag, "autoscaling", "", "Autoscaling (JSON)")
 	f.StringVar(&descriptionFlag, "description", "", "Customer note on the pool")
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the resulting min_count/max_count and the hard platform cap of 100")
 	f.IntVar(&maxCountFlag, "max-count", 0, "New upper bound; omitted desired_count falls to this bound if needed")
@@ -1438,15 +1488,15 @@ func newComputeInstancePoolAttachFloatingIpCommand(state *cli.State) *cobra.Comm
 		Short: "Give the pool a shared public address",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Give the pool a shared public address.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"floating_ip": "floating-ip",
+			}, []string{"floating_ip"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/floating-ips")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1463,7 +1513,6 @@ func newComputeInstancePoolAttachFloatingIpCommand(state *cli.State) *cobra.Comm
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.FloatingIP, "floating-ip", "", "An account-scoped floating IP UUID or CRN (bare names are not accepted), currently attached to nothing")
-	_ = cmd.MarkFlagRequired("floating-ip")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

@@ -129,15 +129,16 @@ func newStorageBucketCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create bucket",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create bucket.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"name":                "name",
+				"object_lock_enabled": "object-lock-enabled",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("object-lock-enabled") {
 				body.ObjectLockEnabled = &objectLockEnabledFlag
@@ -157,7 +158,6 @@ func newStorageBucketCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.BoolVar(&objectLockEnabledFlag, "object-lock-enabled", false, "When true, enables S3 Object Lock on the bucket at creation time and turns versioning on")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -581,15 +581,15 @@ func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 		Use:   "set-cors <bucket>",
 		Short: "Put bucket CORS configuration",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"cors": "cors",
+			}, []string{"cors"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/cors")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if corsFlag != "" {
 				if err := json.Unmarshal([]byte(corsFlag), &body.CORS); err != nil {
@@ -607,7 +607,6 @@ func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&corsFlag, "cors", "", "Cors (JSON)")
-	_ = cmd.MarkFlagRequired("cors")
 	return cmd
 }
 
@@ -620,15 +619,16 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 		Use:   "set-deletion-protection <bucket>",
 		Short: "Set bucket deletion protection",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"enabled":              "enabled",
+				"recovery_window_days": "recovery-window-days",
+			}, []string{"enabled"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/deletion-protection")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
@@ -644,7 +644,6 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.BoolVar(&body.Enabled, "enabled", false, "When true, DeleteBucket schedules deletion instead of removing immediately")
-	_ = cmd.MarkFlagRequired("enabled")
 	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "Whole days; omitted defaults to 7")
 	return cmd
 }
@@ -658,15 +657,15 @@ func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 		Use:   "set-encryption <bucket>",
 		Short: "Put bucket encryption configuration",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"encryption": "encryption",
+			}, []string{"encryption"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/encryption")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if encryptionFlag != "" {
 				if err := json.Unmarshal([]byte(encryptionFlag), &body.Encryption); err != nil {
@@ -684,7 +683,6 @@ func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&encryptionFlag, "encryption", "", "Encryption (JSON)")
-	_ = cmd.MarkFlagRequired("encryption")
 	return cmd
 }
 
@@ -698,6 +696,11 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 		Use:   "set-lifecycle <bucket>",
 		Short: "Put bucket lifecycle configuration",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"lifecycle": "lifecycle",
+			}, []string{"lifecycle"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/lifecycle")
 			if err != nil {
@@ -705,11 +708,6 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 			}
 			if revision == "" {
 				return fmt.Errorf("--revision must be the value returned by get-lifecycle")
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if lifecycleFlag != "" {
 				if err := json.Unmarshal([]byte(lifecycleFlag), &body.Lifecycle); err != nil {
@@ -729,7 +727,6 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 	_ = cmd.MarkFlagRequired("revision")
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&lifecycleFlag, "lifecycle", "", "Lifecycle (JSON)")
-	_ = cmd.MarkFlagRequired("lifecycle")
 	return cmd
 }
 
@@ -742,15 +739,15 @@ func newStorageBucketSetObjectLockCommand(state *cli.State) *cobra.Command {
 		Use:   "set-object-lock <bucket>",
 		Short: "Put bucket object-lock configuration",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"object_lock": "object-lock",
+			}, []string{"object_lock"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/object-lock")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if objectLockFlag != "" {
 				if err := json.Unmarshal([]byte(objectLockFlag), &body.ObjectLock); err != nil {
@@ -768,7 +765,6 @@ func newStorageBucketSetObjectLockCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&objectLockFlag, "object-lock", "", "Object lock (JSON)")
-	_ = cmd.MarkFlagRequired("object-lock")
 	return cmd
 }
 
@@ -781,15 +777,15 @@ func newStorageBucketSetPolicyCommand(state *cli.State) *cobra.Command {
 		Use:   "set-policy <bucket>",
 		Short: "Put bucket policy",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"document": "document",
+			}, []string{"document"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/policy")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if documentFlag != "" {
 				if err := json.Unmarshal([]byte(documentFlag), &body.Document); err != nil {
@@ -807,7 +803,6 @@ func newStorageBucketSetPolicyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&documentFlag, "document", "", "Document (JSON)")
-	_ = cmd.MarkFlagRequired("document")
 	return cmd
 }
 
@@ -820,15 +815,15 @@ func newStorageBucketSetTaggingCommand(state *cli.State) *cobra.Command {
 		Use:   "set-tagging <bucket>",
 		Short: "Put bucket tag set",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"tags": "tags",
+			}, []string{"tags"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/tagging")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if tagsFlag != "" {
 				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
@@ -846,7 +841,6 @@ func newStorageBucketSetTaggingCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	_ = cmd.MarkFlagRequired("tags")
 	return cmd
 }
 
@@ -858,15 +852,15 @@ func newStorageBucketSetVersioningCommand(state *cli.State) *cobra.Command {
 		Use:   "set-versioning <bucket>",
 		Short: "Set bucket versioning state",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"status": "status",
+			}, []string{"status"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/versioning")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if err := c.PutBucketVersioning(cmd.Context(), args[0], &body); err != nil {
 				return err
@@ -879,7 +873,6 @@ func newStorageBucketSetVersioningCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Status, "status", "", "Status (one of: enabled, suspended)")
-	_ = cmd.MarkFlagRequired("status")
 	return cmd
 }
 
@@ -959,15 +952,15 @@ func newStorageMultipartUploadCompleteCommand(state *cli.State) *cobra.Command {
 		Short: "Complete a multipart upload",
 		Args:  cobra.ExactArgs(2),
 		Long:  "Complete a multipart upload.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"parts": "parts",
+			}, []string{"parts"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads/{upload_id}/complete")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if partsFlag != "" {
 				if err := json.Unmarshal([]byte(partsFlag), &body.Parts); err != nil {
@@ -989,7 +982,6 @@ func newStorageMultipartUploadCompleteCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&partsFlag, "parts", "", "Every part the assembled object is made of, in ascending part_number order (JSON)")
-	_ = cmd.MarkFlagRequired("parts")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1007,15 +999,18 @@ func newStorageMultipartUploadInitiateCommand(state *cli.State) *cobra.Command {
 		Short: "Initiate a multipart upload",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Initiate a multipart upload.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"content_type":  "content-type",
+				"key":           "key",
+				"metadata":      "metadata",
+				"storage_class": "storage-class",
+			}, []string{"key"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/multipart-uploads")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("content-type") {
 				body.ContentType = &contentTypeFlag
@@ -1044,7 +1039,6 @@ func newStorageMultipartUploadInitiateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&contentTypeFlag, "content-type", "", "Content type")
 	f.StringVar(&body.Key, "key", "", "Key")
-	_ = cmd.MarkFlagRequired("key")
 	f.StringVar(&metadataFlag, "metadata", "", "Metadata (JSON)")
 	f.StringVar(&storageClassFlag, "storage-class", "", "Storage class")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -1337,15 +1331,18 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create snapshot",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create snapshot.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"name":        "name",
+				"tags":        "tags",
+				"volume":      "volume",
+			}, []string{"name", "volume"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/snapshots")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1371,10 +1368,8 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
-	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1389,15 +1384,16 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <snapshot-id>",
 		Short: "Update snapshot metadata",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/snapshots/{snapshot_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1540,15 +1536,22 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create snapshot policy",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create snapshot policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":      "description",
+				"enabled":          "enabled",
+				"interval_minutes": "interval-minutes",
+				"name":             "name",
+				"retention_count":  "retention-count",
+				"retention_days":   "retention-days",
+				"tags":             "tags",
+				"volume":           "volume",
+			}, []string{"interval_minutes", "name", "retention_count", "volume"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/snapshot-policies")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1581,15 +1584,11 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.BoolVar(&enabledFlag, "enabled", false, "Defaults to true")
 	f.IntVar(&body.IntervalMinutes, "interval-minutes", 0, "Interval minutes")
-	_ = cmd.MarkFlagRequired("interval-minutes")
 	f.StringVar(&body.Name, "name", "", "Unique within the account — it names the policy in its CRN")
-	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&body.RetentionCount, "retention-count", 0, "Retention count")
-	_ = cmd.MarkFlagRequired("retention-count")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Retention days")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
-	_ = cmd.MarkFlagRequired("volume")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1608,15 +1607,20 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <policy-id>",
 		Short: "Update snapshot policy",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":      "description",
+				"enabled":          "enabled",
+				"interval_minutes": "interval-minutes",
+				"retention_count":  "retention-count",
+				"retention_days":   "retention-days",
+				"tags":             "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1774,15 +1778,24 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create volume",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create volume.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"architecture":    "architecture",
+				"bootable":        "bootable",
+				"description":     "description",
+				"name":            "name",
+				"performance":     "performance",
+				"size_gb":         "size-gb",
+				"source_image":    "source-image",
+				"source_snapshot": "source-snapshot",
+				"tags":            "tags",
+				"volume_type":     "volume-type",
+			}, []string{"name", "size_gb", "volume_type"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/volumes")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("architecture") {
 				body.Architecture = &architectureFlag
@@ -1827,15 +1840,12 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&bootableFlag, "bootable", false, "Bootable")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&performanceFlag, "performance", "", "Performance (JSON)")
 	f.IntVar(&body.SizeGB, "size-gb", 0, "Size gb")
-	_ = cmd.MarkFlagRequired("size-gb")
 	f.StringVar(&sourceImageFlag, "source-image", "", "Image UUID, name, name:version, or full CRN image/<name>/architecture/<arch>/version/<version>")
 	f.StringVar(&sourceSnapshotFlag, "source-snapshot", "", "Clone from an available account-owned snapshot UUID or nested CRN volume/<volume-name>/snapshot/<snapshot-name>")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar((*string)(&body.VolumeType), "volume-type", "", "Volume type (one of: ssd, nvme)")
-	_ = cmd.MarkFlagRequired("volume-type")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1850,15 +1860,16 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <volume-id>",
 		Short: "Update volume metadata",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/volumes/{volume_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -1916,15 +1927,15 @@ func newStorageVolumeExtendCommand(state *cli.State) *cobra.Command {
 		Short: "Extend volume",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Extend volume.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"new_size_gb": "new-size-gb",
+			}, []string{"new_size_gb"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/volumes/{volume_id}/extend")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			var reqOpts []basaltic.RequestOption
 			if idempotencyKey != "" {
@@ -1941,7 +1952,6 @@ func newStorageVolumeExtendCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&body.NewSizeGB, "new-size-gb", 0, "New size in GB")
-	_ = cmd.MarkFlagRequired("new-size-gb")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1958,15 +1968,16 @@ func newStorageVolumeUpdatePerformanceCommand(state *cli.State) *cobra.Command {
 		Short: "Update provisioned performance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Update provisioned performance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"iops":             "iops",
+				"throughput_mib_s": "throughput-mib-s",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/volumes/{volume_id}/performance")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("iops") {
 				body.IOPS = &iopsFlag

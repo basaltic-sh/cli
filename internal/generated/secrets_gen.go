@@ -128,15 +128,20 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a new secret with an initial value",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a new secret with an initial value.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":          "description",
+				"kms_key":              "kms-key",
+				"name":                 "name",
+				"recovery_window_days": "recovery-window-days",
+				"tags":                 "tags",
+				"value":                "value",
+			}, []string{"name", "value"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := secretsClient(state, "/v1/secrets")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -176,11 +181,9 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&kmsKeyFlag, "kms-key", "", "UUID, CRN or account-scoped name of a customer-managed KMS key to encrypt this secret under")
 	f.StringVar(&body.Name, "name", "", "Unique within the calling account")
-	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "Recovery window days")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&valueFlag, "value", "", "Base64 of the initial value bytes (1 byte - 64 KiB)")
-	_ = cmd.MarkFlagRequired("value")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -195,15 +198,16 @@ func newSecretsSecretUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <secret-id>",
 		Short: "Update mutable metadata",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := secretsClient(state, "/v1/secrets/{secret_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -237,15 +241,15 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 		Use:   "delete <secret-id>",
 		Short: "Schedule deletion (soft delete with recovery window)",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"recovery_window_days": "recovery-window-days",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := secretsClient(state, "/v1/secrets/{secret_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
@@ -363,15 +367,15 @@ func newSecretsSecretSetValueCommand(state *cli.State) *cobra.Command {
 		Short: "Store a new version (becomes current)",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Store a new version (becomes current).\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"value": "value",
+			}, []string{"value"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := secretsClient(state, "/v1/secrets/{secret_id}/value")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("value") {
 				decoded, err := base64.StdEncoding.DecodeString(valueFlag)
@@ -395,7 +399,6 @@ func newSecretsSecretSetValueCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&valueFlag, "value", "", "Base64 of the new value bytes (1 byte - 64 KiB)")
-	_ = cmd.MarkFlagRequired("value")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

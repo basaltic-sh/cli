@@ -126,15 +126,20 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a listener on this load balancer",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Create a listener on this load balancer.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"certificates":         "certificates",
+				"default_target_group": "default-target-group",
+				"exposure":             "exposure",
+				"port":                 "port",
+				"protocol":             "protocol",
+				"tags":                 "tags",
+			}, []string{"port", "protocol"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if certificatesFlag != "" {
 				if err := json.Unmarshal([]byte(certificatesFlag), &body.Certificates); err != nil {
@@ -170,9 +175,7 @@ func newLoadbalancerListenerCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&defaultTargetGroupFlag, "default-target-group", "", "Default target group")
 	f.StringVar(&exposureFlag, "exposure", "", "Which LB addresses are bound (one of: public_only, private_only, both)")
 	f.IntVar(&body.Port, "port", 0, "Port")
-	_ = cmd.MarkFlagRequired("port")
 	f.StringVar(&body.Protocol, "protocol", "", "Protocol (one of: http, https, tcp, udp)")
-	_ = cmd.MarkFlagRequired("protocol")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -191,15 +194,19 @@ func newLoadbalancerListenerUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <id> <listener-id>",
 		Short: "Patch a listener (rotate cert, change default target group)",
 		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"certificate":                "certificate",
+				"clear_default_target_group": "clear-default-target-group",
+				"default_target_group":       "default-target-group",
+				"exposure":                   "exposure",
+				"tags":                       "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("certificate") {
 				body.Certificate = &certificateFlag
@@ -270,15 +277,16 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 		Short: "Attach an additional certificate to an HTTPS listener",
 		Args:  cobra.ExactArgs(2),
 		Long:  "Attach an additional certificate to an HTTPS listener.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"certificate": "certificate",
+				"is_default":  "is-default",
+			}, []string{"certificate"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/certificates")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("is-default") {
 				body.IsDefault = &isDefaultFlag
@@ -298,7 +306,6 @@ func newLoadbalancerListenerAttachCertificateCommand(state *cli.State) *cobra.Co
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&body.Certificate, "certificate", "", "The certificate to serve, by CRN, UUID or exact account-scoped name")
-	_ = cmd.MarkFlagRequired("certificate")
 	f.BoolVar(&isDefaultFlag, "is-default", false, "When true, demote whatever's currently default and promote this cert in the same transaction")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -407,7 +414,11 @@ func newLoadbalancerLoadBalancerGetCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.CreateLoadBalancerRequest
 	var bodyFile string
+	var autoscalingFlag string
+	var desiredCountFlag int
 	var floatingIpFlag string
+	var maxCountFlag int
+	var minCountFlag int
 	var replicaCountFlag int
 	var tagsFlag string
 	var idempotencyKey string
@@ -416,18 +427,45 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a load balancer",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a load balancer.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"autoscaling":     "autoscaling",
+				"desired_count":   "desired-count",
+				"flavor":          "flavor",
+				"floating_ip":     "floating-ip",
+				"floating_ips":    "floating-ips",
+				"max_count":       "max-count",
+				"min_count":       "min-count",
+				"name":            "name",
+				"replica_count":   "replica-count",
+				"security_groups": "security-groups",
+				"subnet":          "subnet",
+				"tags":            "tags",
+				"type":            "type",
+				"vpc":             "vpc",
+			}, []string{"flavor", "name", "security_groups", "subnet", "type", "vpc"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers")
 			if err != nil {
 				return err
 			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
+			if autoscalingFlag != "" {
+				if err := json.Unmarshal([]byte(autoscalingFlag), &body.Autoscaling); err != nil {
+					return fmt.Errorf("--autoscaling: %w", err)
 				}
+			}
+			if cmd.Flags().Changed("desired-count") {
+				body.DesiredCount = &desiredCountFlag
 			}
 			if cmd.Flags().Changed("floating-ip") {
 				body.FloatingIP = &floatingIpFlag
+			}
+			if cmd.Flags().Changed("max-count") {
+				body.MaxCount = &maxCountFlag
+			}
+			if cmd.Flags().Changed("min-count") {
+				body.MinCount = &minCountFlag
 			}
 			if cmd.Flags().Changed("replica-count") {
 				body.ReplicaCount = &replicaCountFlag
@@ -451,22 +489,20 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&autoscalingFlag, "autoscaling", "", "Autoscaling (JSON)")
+	f.IntVar(&desiredCountFlag, "desired-count", 0, "Steady target within min_count and max_count")
 	f.StringVar(&body.Flavor, "flavor", "", "Compute flavor for each LB instance")
-	_ = cmd.MarkFlagRequired("flavor")
 	f.StringVar(&floatingIpFlag, "floating-ip", "", "Public IPv4 shorthand")
 	f.StringSliceVar(&body.FloatingIPs, "floating-ips", nil, "Existing free floating IPs from this account and region, at most one per family and visibility (private/public, IPv4/IPv6)")
+	f.IntVar(&maxCountFlag, "max-count", 0, "Upper capacity bound including rollout surge")
+	f.IntVar(&minCountFlag, "min-count", 0, "Lower capacity bound")
 	f.StringVar(&body.Name, "name", "", "1..127 chars of [A-Za-z0-9._-] Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
-	f.IntVar(&replicaCountFlag, "replica-count", 0, "Number of LB compute instances")
+	f.IntVar(&replicaCountFlag, "replica-count", 0, "Deprecated input alias of desired_count; send only one")
 	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security groups attached to every replica NIC (AWS ALB shape)")
-	_ = cmd.MarkFlagRequired("security-groups")
 	f.StringVar(&body.Subnet, "subnet", "", "Subnet the LB instances attach to")
-	_ = cmd.MarkFlagRequired("subnet")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&body.Type, "type", "", "Type (one of: application, network)")
-	_ = cmd.MarkFlagRequired("type")
 	f.StringVar(&body.VPC, "vpc", "", "VPC the LB will live in")
-	_ = cmd.MarkFlagRequired("vpc")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -475,25 +511,49 @@ func newLoadbalancerLoadBalancerCreateCommand(state *cli.State) *cobra.Command {
 func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	var body loadbalancer.UpdateLoadBalancerRequest
 	var bodyFile string
+	var autoscalingFlag string
+	var desiredCountFlag int
 	var flavorFlag string
+	var maxCountFlag int
+	var minCountFlag int
 	var replicaCountFlag int
 	var tagsFlag string
 	cmd := &cobra.Command{
 		Use:   "update <id>",
 		Short: "Scale or resize a load balancer",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"autoscaling":   "autoscaling",
+				"desired_count": "desired-count",
+				"flavor":        "flavor",
+				"max_count":     "max-count",
+				"min_count":     "min-count",
+				"replica_count": "replica-count",
+				"tags":          "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}")
 			if err != nil {
 				return err
 			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
+			if autoscalingFlag != "" {
+				if err := json.Unmarshal([]byte(autoscalingFlag), &body.Autoscaling); err != nil {
+					return fmt.Errorf("--autoscaling: %w", err)
 				}
+			}
+			if cmd.Flags().Changed("desired-count") {
+				body.DesiredCount = &desiredCountFlag
 			}
 			if cmd.Flags().Changed("flavor") {
 				body.Flavor = &flavorFlag
+			}
+			if cmd.Flags().Changed("max-count") {
+				body.MaxCount = &maxCountFlag
+			}
+			if cmd.Flags().Changed("min-count") {
+				body.MinCount = &minCountFlag
 			}
 			if cmd.Flags().Changed("replica-count") {
 				body.ReplicaCount = &replicaCountFlag
@@ -513,8 +573,12 @@ func newLoadbalancerLoadBalancerUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&autoscalingFlag, "autoscaling", "", "Autoscaling (JSON)")
+	f.IntVar(&desiredCountFlag, "desired-count", 0, "Steady target within min_count and max_count")
 	f.StringVar(&flavorFlag, "flavor", "", "Resize each replica to a different compute flavor")
-	f.IntVar(&replicaCountFlag, "replica-count", 0, "Resize the set of load balancer instances")
+	f.IntVar(&maxCountFlag, "max-count", 0, "Upper capacity bound including rollout surge")
+	f.IntVar(&minCountFlag, "min-count", 0, "Lower capacity bound")
+	f.IntVar(&replicaCountFlag, "replica-count", 0, "Deprecated alias of desired_count; send only one")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -645,15 +709,17 @@ func newLoadbalancerRuleCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a routing rule on this listener (HTTP/HTTPS only)",
 		Args:  cobra.ExactArgs(2),
 		Long:  "Create a routing rule on this listener (HTTP/HTTPS only).\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"conditions":   "conditions",
+				"priority":     "priority",
+				"target_group": "target-group",
+			}, []string{"conditions", "priority", "target_group"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if conditionsFlag != "" {
 				if err := json.Unmarshal([]byte(conditionsFlag), &body.Conditions); err != nil {
@@ -675,11 +741,8 @@ func newLoadbalancerRuleCreateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&conditionsFlag, "conditions", "", "Conditions (JSON)")
-	_ = cmd.MarkFlagRequired("conditions")
 	f.IntVar(&body.Priority, "priority", 0, "Priority")
-	_ = cmd.MarkFlagRequired("priority")
 	f.StringVar(&body.TargetGroup, "target-group", "", "Target group")
-	_ = cmd.MarkFlagRequired("target-group")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -693,15 +756,17 @@ func newLoadbalancerRuleUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <id> <listener-id> <rule-id>",
 		Short: "Update a routing rule (full replace)",
 		Args:  cobra.ExactArgs(3),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"conditions":   "conditions",
+				"priority":     "priority",
+				"target_group": "target-group",
+			}, []string{"conditions", "priority", "target_group"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/load-balancers/{id}/listeners/{listener_id}/rules/{rule_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if conditionsFlag != "" {
 				if err := json.Unmarshal([]byte(conditionsFlag), &body.Conditions); err != nil {
@@ -719,11 +784,8 @@ func newLoadbalancerRuleUpdateCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&conditionsFlag, "conditions", "", "Conditions (JSON)")
-	_ = cmd.MarkFlagRequired("conditions")
 	f.IntVar(&body.Priority, "priority", 0, "Priority")
-	_ = cmd.MarkFlagRequired("priority")
 	f.StringVar(&body.TargetGroup, "target-group", "", "Target group")
-	_ = cmd.MarkFlagRequired("target-group")
 	return cmd
 }
 
@@ -846,15 +908,24 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a target group",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a target group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"health_check":     "health-check",
+				"instance_pool":    "instance-pool",
+				"name":             "name",
+				"port":             "port",
+				"protocol":         "protocol",
+				"proxy_protocol":   "proxy-protocol",
+				"session_affinity": "session-affinity",
+				"tags":             "tags",
+				"target_mode":      "target-mode",
+				"target_type":      "target-type",
+			}, []string{"name", "port", "protocol"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/target-groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if healthCheckFlag != "" {
 				if err := json.Unmarshal([]byte(healthCheckFlag), &body.HealthCheck); err != nil {
@@ -900,11 +971,8 @@ func newLoadbalancerTargetGroupCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&healthCheckFlag, "health-check", "", "Health check (JSON)")
 	f.StringVar(&instancePoolFlag, "instance-pool", "", "Compute instance pool to draw backends from")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&body.Port, "port", 0, "Port")
-	_ = cmd.MarkFlagRequired("port")
 	f.StringVar(&body.Protocol, "protocol", "", "Protocol (one of: http, https, tcp, udp)")
-	_ = cmd.MarkFlagRequired("protocol")
 	f.BoolVar(&proxyProtocolFlag, "proxy-protocol", false, "Proxy protocol")
 	f.StringVar(&sessionAffinityFlag, "session-affinity", "", "Session affinity (JSON)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
@@ -926,15 +994,18 @@ func newLoadbalancerTargetGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <id>",
 		Short: "Update target group health checks, framing, or stickiness",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"health_check":     "health-check",
+				"proxy_protocol":   "proxy-protocol",
+				"session_affinity": "session-affinity",
+				"tags":             "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/target-groups/{id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if healthCheckFlag != "" {
 				if err := json.Unmarshal([]byte(healthCheckFlag), &body.HealthCheck); err != nil {
@@ -1005,15 +1076,16 @@ func newLoadbalancerTargetGroupAttachTargetCommand(state *cli.State) *cobra.Comm
 		Short: "Attach a target to this group",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach a target to this group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"port":   "port",
+				"target": "target",
+			}, []string{"target"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadbalancerClient(state, "/v1/target-groups/{id}/targets")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("port") {
 				body.Port = &portFlag
@@ -1034,7 +1106,6 @@ func newLoadbalancerTargetGroupAttachTargetCommand(state *cli.State) *cobra.Comm
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&portFlag, "port", 0, "Port")
 	f.StringVar(&body.Target, "target", "", "Must match the group's target_type: an IP address for ip, a compute instance UUID, CRN or exact account-scoped name for instance")
-	_ = cmd.MarkFlagRequired("target")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }

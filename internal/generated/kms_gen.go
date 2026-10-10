@@ -137,15 +137,19 @@ func newKmsKeyCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a KMS key",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a KMS key.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"key_spec":    "key-spec",
+				"key_usage":   "key-usage",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"key_spec", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -174,10 +178,8 @@ func newKmsKeyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar((*string)(&body.KeySpec), "key-spec", "", "Key spec (one of: aes-256, rsa-2048, rsa-4096, ecdsa-p256)")
-	_ = cmd.MarkFlagRequired("key-spec")
 	f.StringVar(&keyUsageFlag, "key-usage", "", "Required for RSA specs (both encrypt_decrypt and sign_verify are valid) (one of: encrypt_decrypt, sign_verify)")
 	f.StringVar(&body.Name, "name", "", "Unique per account")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -193,15 +195,16 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <key-id>",
 		Short: "Update key metadata",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -259,15 +262,16 @@ func newKmsKeyDecryptCommand(state *cli.State) *cobra.Command {
 		Use:   "decrypt <key-id>",
 		Short: "Decrypt a ciphertext",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"aad":        "aad",
+				"ciphertext": "ciphertext",
+			}, []string{"ciphertext"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/decrypt")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("aad") {
 				decoded, err := base64.StdEncoding.DecodeString(aadFlag)
@@ -295,7 +299,6 @@ func newKmsKeyDecryptCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&aadFlag, "aad", "", "Optional base64-encoded AAD")
 	f.StringVar(&ciphertextFlag, "ciphertext", "", "Base64-encoded ciphertext produced by Encrypt")
-	_ = cmd.MarkFlagRequired("ciphertext")
 	return cmd
 }
 
@@ -355,15 +358,16 @@ func newKmsKeyEncryptCommand(state *cli.State) *cobra.Command {
 		Use:   "encrypt <key-id>",
 		Short: "Encrypt a payload",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"aad":       "aad",
+				"plaintext": "plaintext",
+			}, []string{"plaintext"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/encrypt")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("aad") {
 				decoded, err := base64.StdEncoding.DecodeString(aadFlag)
@@ -391,7 +395,6 @@ func newKmsKeyEncryptCommand(state *cli.State) *cobra.Command {
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&aadFlag, "aad", "", "Optional base64-encoded additional authenticated data (AES-GCM AEAD)")
 	f.StringVar(&plaintextFlag, "plaintext", "", "Base64-encoded plaintext")
-	_ = cmd.MarkFlagRequired("plaintext")
 	return cmd
 }
 
@@ -404,15 +407,15 @@ func newKmsKeyGenerateDataKeyCommand(state *cli.State) *cobra.Command {
 		Use:   "generate-data-key <key-id>",
 		Short: "Generate a fresh data key",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"number_of_bytes": "number-of-bytes",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/generate-data-key")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("number-of-bytes") {
 				body.NumberOfBytes = &numberOfBytesFlag
@@ -440,15 +443,15 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 		Use:   "schedule-deletion <key-id>",
 		Short: "Schedule key for deletion",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"recovery_window_days": "recovery-window-days",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/schedule-deletion")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
@@ -477,15 +480,16 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 		Use:   "sign <key-id>",
 		Short: "Sign a message",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"message":           "message",
+				"signing_algorithm": "signing-algorithm",
+			}, []string{"message"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/sign")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("message") {
 				decoded, err := base64.StdEncoding.DecodeString(messageFlag)
@@ -508,7 +512,6 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&messageFlag, "message", "", "Base64-encoded message to sign")
-	_ = cmd.MarkFlagRequired("message")
 	f.StringVar(&signingAlgorithmFlag, "signing-algorithm", "", "Signing algorithm (one of: RSASSA_PSS_SHA_256, RSASSA_PKCS1_V1_5_SHA_256, ECDSA_SHA_256)")
 	return cmd
 }
@@ -524,15 +527,17 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 		Use:   "verify <key-id>",
 		Short: "Verify a signature",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"message":           "message",
+				"signature":         "signature",
+				"signing_algorithm": "signing-algorithm",
+			}, []string{"message", "signature"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/verify")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("message") {
 				decoded, err := base64.StdEncoding.DecodeString(messageFlag)
@@ -562,9 +567,7 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&messageFlag, "message", "", "Base64-encoded original message")
-	_ = cmd.MarkFlagRequired("message")
 	f.StringVar(&signatureFlag, "signature", "", "Base64-encoded signature produced by Sign")
-	_ = cmd.MarkFlagRequired("signature")
 	f.StringVar(&signingAlgorithmFlag, "signing-algorithm", "", "Signing algorithm (one of: RSASSA_PSS_SHA_256, RSASSA_PKCS1_V1_5_SHA_256, ECDSA_SHA_256)")
 	return cmd
 }

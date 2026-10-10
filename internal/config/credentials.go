@@ -111,8 +111,10 @@ func (s *FileTokenSource) Token(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	file.store(s.Profile, s.Inner.AccessKeyID, token, s.Inner.ExpiresAt())
-	if err := saveCredentials(path, file); err != nil {
+	if err := updateCredentials(ctx, path, func(file *credentialsFile) error {
+		file.store(s.Profile, s.Inner.AccessKeyID, token, s.Inner.ExpiresAt())
+		return nil
+	}); err != nil {
 		// A cache we could not write costs one exchange next time. It must
 		// not fail the command.
 		fmt.Fprintf(os.Stderr, "warning: could not cache the access token: %v\n", err)
@@ -144,12 +146,10 @@ func (s *FileTokenSource) forget() {
 	if err != nil {
 		return
 	}
-	file := loadCredentials(path)
-	if file.Tokens == nil {
-		return
-	}
-	delete(file.Tokens, s.Profile)
-	_ = saveCredentials(path, file)
+	_ = updateCredentials(context.Background(), path, func(file *credentialsFile) error {
+		delete(file.Tokens, s.Profile)
+		return nil
+	})
 }
 
 // ForgetProfileToken clears a profile's cached token without needing a
@@ -161,12 +161,10 @@ func ForgetProfileToken(profile string) error {
 	if err != nil {
 		return err
 	}
-	file := loadCredentials(path)
-	if _, ok := file.Tokens[profile]; !ok {
+	return updateCredentials(context.Background(), path, func(file *credentialsFile) error {
+		delete(file.Tokens, profile)
 		return nil
-	}
-	delete(file.Tokens, profile)
-	return saveCredentials(path, file)
+	})
 }
 
 // CachedTokenExpiry reports when a profile's cached token expires, for
@@ -224,17 +222,13 @@ func StoreSession(profile, accessToken, refreshToken, tokenEndpoint string, expi
 	if err != nil {
 		return err
 	}
-	file := loadCredentials(path)
-	if file.Sessions == nil {
-		file.Sessions = map[string]userSession{}
-	}
-	file.Sessions[profile] = userSession{
-		AccessToken:   accessToken,
-		RefreshToken:  refreshToken,
-		ExpiresAt:     expiresAt,
-		TokenEndpoint: tokenEndpoint,
-	}
-	return saveCredentials(path, file)
+	return updateCredentials(context.Background(), path, func(file *credentialsFile) error {
+		if file.Sessions == nil {
+			file.Sessions = map[string]userSession{}
+		}
+		file.Sessions[profile] = userSession{AccessToken: accessToken, RefreshToken: refreshToken, TokenEndpoint: tokenEndpoint, ExpiresAt: expiresAt}
+		return nil
+	})
 }
 
 // ForgetSession clears a profile's user session. Returns the refresh token it
@@ -245,13 +239,13 @@ func ForgetSession(profile string) (refreshToken, tokenEndpoint string, err erro
 	if perr != nil {
 		return "", "", perr
 	}
-	file := loadCredentials(path)
-	s, ok := file.Sessions[profile]
-	if !ok {
-		return "", "", nil
-	}
-	delete(file.Sessions, profile)
-	return s.RefreshToken, s.TokenEndpoint, saveCredentials(path, file)
+	err = updateCredentials(context.Background(), path, func(file *credentialsFile) error {
+		s := file.Sessions[profile]
+		refreshToken, tokenEndpoint = s.RefreshToken, s.TokenEndpoint
+		delete(file.Sessions, profile)
+		return nil
+	})
+	return refreshToken, tokenEndpoint, err
 }
 
 func (f *credentialsFile) store(profile, accessKeyID, token string, expiresAt time.Time) {

@@ -27,7 +27,8 @@ type SessionTokenSource struct {
 	Client  *http.Client
 	Refresh Refresher
 
-	mu sync.Mutex
+	mu         sync.Mutex
+	lastAccess string
 }
 
 // ErrSessionExpired means the stored session can no longer be renewed and a
@@ -40,32 +41,44 @@ func (s *SessionTokenSource) Token(ctx context.Context) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	access, refresh, endpoint, expires, ok := LookupSession(s.Profile)
-	if !ok {
-		return "", ErrSessionExpired
-	}
-	if SessionFresh(expires) {
-		return access, nil
-	}
-	if refresh == "" || endpoint == "" {
-		return "", ErrSessionExpired
-	}
-
-	newAccess, newRefresh, newExpiry, err := s.Refresh(ctx, s.Client, endpoint, refresh)
+	path, err := CredentialsPath()
 	if err != nil {
-		// A refusal here is not a transport problem to retry — the session is
-		// over. Clearing the stored copy stops every later command repeating
-		// the same doomed refresh.
-		_, _, _ = ForgetSession(s.Profile)
-		return "", ErrSessionExpired
-	}
-
-	// Store BEFORE returning. The refresh token rotated, and the one we just
-	// spent is already dead on the server; losing the replacement here would
-	// end the session on the next command with nothing to explain why.
-	if err := StoreSession(s.Profile, newAccess, newRefresh, endpoint, newExpiry); err != nil {
 		return "", err
 	}
+	unlock, err := lockCredentials(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	file := loadCredentials(path)
+	session, ok := file.Sessions[s.Profile]
+	if !ok || session.AccessToken == "" {
+		return "", ErrSessionExpired
+	}
+	if SessionFresh(session.ExpiresAt) {
+		s.lastAccess = session.AccessToken
+		return session.AccessToken, nil
+	}
+	if session.RefreshToken == "" || session.TokenEndpoint == "" {
+		return "", ErrSessionExpired
+	}
+	newAccess, newRefresh, newExpiry, err := s.Refresh(ctx, s.Client, session.TokenEndpoint, session.RefreshToken)
+	if err != nil {
+		// Only an explicit OAuth revocation invalidates a login. Network failures
+		// and cancellation leave the refresh token available for a later attempt.
+		if errors.Is(err, ErrSessionExpired) {
+			delete(file.Sessions, s.Profile)
+			if saveErr := saveCredentials(path, file); saveErr != nil {
+				return "", saveErr
+			}
+		}
+		return "", err
+	}
+	file.Sessions[s.Profile] = userSession{AccessToken: newAccess, RefreshToken: newRefresh, ExpiresAt: newExpiry, TokenEndpoint: session.TokenEndpoint}
+	if err := saveCredentials(path, file); err != nil {
+		return "", err
+	}
+	s.lastAccess = newAccess
 	return newAccess, nil
 }
 
@@ -77,5 +90,16 @@ func (s *SessionTokenSource) Token(ctx context.Context) (string, error) {
 func (s *SessionTokenSource) Invalidate() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, _, _ = ForgetSession(s.Profile)
+	path, err := CredentialsPath()
+	if err != nil {
+		return
+	}
+	_ = updateCredentials(context.Background(), path, func(file *credentialsFile) error {
+		// A request carrying an older token may fail after another process has
+		// renewed the session. It must not erase that replacement.
+		if s.lastAccess != "" && file.Sessions[s.Profile].AccessToken == s.lastAccess {
+			delete(file.Sessions, s.Profile)
+		}
+		return nil
+	})
 }

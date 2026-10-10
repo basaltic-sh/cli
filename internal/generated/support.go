@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/basaltic-sh/cli/internal/progress"
+	"github.com/spf13/cobra"
 
 	"gopkg.in/yaml.v3"
 )
@@ -53,6 +54,48 @@ func loadBody(path string, v any) error {
 	}
 	if err := json.Unmarshal(asJSON, v); err != nil {
 		return fmt.Errorf("--from-file %s: %w", path, err)
+	}
+	return nil
+}
+
+// prepareBody loads file fields before validating required body inputs. Explicit
+// flags keep their already-bound values; structured flags are applied by RunE.
+// Presence is checked separately from value so false, zero and empty arrays
+// remain valid inputs for API fields that permit them.
+func prepareBody(cmd *cobra.Command, path string, v any, fields map[string]string, required []string) error {
+	var values map[string]json.RawMessage
+	if path != "" {
+		if err := loadBody(path, &values); err != nil {
+			return err
+		}
+		if values == nil {
+			return fmt.Errorf("--from-file %s must contain an object", path)
+		}
+	}
+	var missing []string
+	for _, wire := range required {
+		name := fields[wire]
+		value, present := values[wire]
+		if !cmd.Flags().Changed(name) && (!present || string(value) == "null") {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("required field(s) %s not set: supply flags or --from-file fields", strings.Join(missing, ", "))
+	}
+	for wire, name := range fields {
+		if cmd.Flags().Changed(name) {
+			delete(values, wire)
+		}
+	}
+	if path != "" {
+		data, err := json.Marshal(values)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(data, v); err != nil {
+			return fmt.Errorf("--from-file %s: %w", path, err)
+		}
 	}
 	return nil
 }

@@ -121,15 +121,22 @@ func newCertificateCertificateCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create certificate",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create certificate.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"certificate_pem": "certificate-pem",
+				"chain_pem":       "chain-pem",
+				"domains":         "domains",
+				"key_algorithm":   "key-algorithm",
+				"name":            "name",
+				"private_key_pem": "private-key-pem",
+				"source":          "source",
+				"tags":            "tags",
+			}, []string{"domains", "name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := certificateClient(state, "/v1/certificates")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("certificate-pem") {
 				body.CertificatePEM = &certificatePemFlag
@@ -168,10 +175,8 @@ func newCertificateCertificateCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&certificatePemFlag, "certificate-pem", "", "PEM-encoded leaf certificate")
 	f.StringVar(&chainPemFlag, "chain-pem", "", "PEM-encoded intermediate chain (optional when source=uploaded)")
 	f.StringSliceVar(&body.Domains, "domains", nil, "Capped at 100 to stay inside the certificate authority's per-order limits")
-	_ = cmd.MarkFlagRequired("domains")
 	f.StringVar(&keyAlgorithmFlag, "key-algorithm", "", "Key algorithm (one of: ecdsa-p256, ecdsa-p384, rsa-2048, rsa-4096)")
 	f.StringVar(&body.Name, "name", "", "Unique per account")
-	_ = cmd.MarkFlagRequired("name")
 	f.StringVar(&privateKeyPemFlag, "private-key-pem", "", "PEM-encoded private key")
 	f.StringVar(&sourceFlag, "source", "", "Defaults to \"acme\" — issued by the platform CA (one of: acme, uploaded)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")

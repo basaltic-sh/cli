@@ -149,15 +149,15 @@ func newTelemetryLogIngestCommand(state *cli.State) *cobra.Command {
 		Use:   "ingest",
 		Short: "Ingest a batch of log records",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"logs": "logs",
+			}, []string{"logs"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/logs")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if logsFlag != "" {
 				if err := json.Unmarshal([]byte(logsFlag), &body.Logs); err != nil {
@@ -175,7 +175,6 @@ func newTelemetryLogIngestCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&logsFlag, "logs", "", "Logs (JSON)")
-	_ = cmd.MarkFlagRequired("logs")
 	return cmd
 }
 
@@ -267,15 +266,19 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 		Short: "Create a log group",
 		Args:  cobra.ExactArgs(0),
 		Long:  "Create a log group.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"description":    "description",
+				"kms_key":        "kms-key",
+				"name":           "name",
+				"retention_days": "retention-days",
+				"tags":           "tags",
+			}, []string{"name"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/log-groups")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -308,7 +311,6 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	_ = cmd.MarkFlagRequired("name")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650, or omit for never expire")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -328,15 +330,19 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Use:   "update <id>",
 		Short: "Update a log group",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"clear_retention": "clear-retention",
+				"description":     "description",
+				"kms_key":         "kms-key",
+				"retention_days":  "retention-days",
+				"tags":            "tags",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/log-groups/{id}")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("clear-retention") {
 				body.ClearRetention = &clearRetentionFlag
@@ -710,15 +716,15 @@ func newTelemetrySpanIngestCommand(state *cli.State) *cobra.Command {
 		Use:   "ingest",
 		Short: "Ingest a batch of trace spans",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"spans": "spans",
+			}, []string{"spans"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/spans")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if spansFlag != "" {
 				if err := json.Unmarshal([]byte(spansFlag), &body.Spans); err != nil {
@@ -736,7 +742,6 @@ func newTelemetrySpanIngestCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.StringVar(&spansFlag, "spans", "", "Spans (JSON)")
-	_ = cmd.MarkFlagRequired("spans")
 	return cmd
 }
 
@@ -925,15 +930,17 @@ func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
 		Use:   "set",
 		Short: "Update the caller account's trace settings",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"clear_retention": "clear-retention",
+				"kms_key":         "kms-key",
+				"retention_days":  "retention-days",
+			}, []string{})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/trace-settings")
 			if err != nil {
 				return err
-			}
-			if bodyFile != "" {
-				if err := loadBody(bodyFile, &body); err != nil {
-					return err
-				}
 			}
 			if cmd.Flags().Changed("clear-retention") {
 				body.ClearRetention = &clearRetentionFlag
