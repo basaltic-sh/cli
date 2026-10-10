@@ -3,11 +3,13 @@ package cli_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -91,5 +93,45 @@ func TestLifecycleRevisionRoundTrip(t *testing.T) {
 		if got := <-requests; got != method+` "revision-1"` {
 			t.Fatal(got)
 		}
+	}
+}
+
+func TestLifecycleDatesRemainOptional(t *testing.T) {
+	for _, rule := range []string{
+		`{"status":"enabled","expiration":{"days":30},"transition":{"days":0,"storage_class":"COLD"}}`,
+		`{"status":"enabled","expiration":{"date":"2030-01-01T00:00:00Z"},"transition":{"date":"2029-01-01T00:00:00Z","storage_class":"COLD"}}`,
+	} {
+		t.Run(rule, func(t *testing.T) {
+			wire := make(chan []byte, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Error(err)
+				}
+				wire <- body
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			config := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(config, []byte("profiles:\n  default:\n    region: test-region\n    endpoints:\n      storage: "+server.URL+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			lifecycle := `{"rules":[` + rule + `]}`
+			cmd := exec.Command(os.Args[0], "-test.run=^TestLifecycleCLIProcess$", "--", "storage", "bucket", "set-lifecycle", "example", "--revision", "revision-1", "--lifecycle", lifecycle)
+			cmd.Env = append(os.Environ(), "BASALTIC_LIFECYCLE_TEST_PROCESS=1", "BASALTIC_CONFIG_FILE="+config, "BASALTIC_PROFILE=default", "BASALTIC_ACCESS_TOKEN=test-only", "BASALTIC_NO_UPDATE_CHECK=1")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("CLI: %v %s", err, out)
+			}
+			var got, want any
+			if err := json.Unmarshal(<-wire, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(`{"lifecycle":`+lifecycle+`}`), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("wire body=%#v; want %#v", got, want)
+			}
+		})
 	}
 }

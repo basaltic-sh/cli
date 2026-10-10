@@ -373,6 +373,23 @@ func newBillingProfileListCommand(state *cli.State) *cobra.Command {
 func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 	var body billing.BillingProfile
 	var bodyFile string
+	var cityFlag string
+	var companyNameFlag string
+	var complementFlag string
+	var countryFlag string
+	var customerTypeFlag string
+	var emailFlag string
+	var foreignTaxIdFlag string
+	var municipalityCodeFlag string
+	var neighborhoodFlag string
+	var noTaxIdReasonFlag string
+	var phoneFlag string
+	var postalCodeFlag string
+	var readyFlag bool
+	var stateFlag string
+	var streetNameFlag string
+	var streetNumberFlag string
+	var taxIdFlag string
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Save organization billing details",
@@ -387,6 +404,57 @@ func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 					return err
 				}
 			}
+			if cmd.Flags().Changed("city") {
+				body.City = &cityFlag
+			}
+			if cmd.Flags().Changed("company-name") {
+				body.CompanyName = &companyNameFlag
+			}
+			if cmd.Flags().Changed("complement") {
+				body.Complement = &complementFlag
+			}
+			if cmd.Flags().Changed("country") {
+				body.Country = &countryFlag
+			}
+			if cmd.Flags().Changed("customer-type") {
+				body.CustomerType = &customerTypeFlag
+			}
+			if cmd.Flags().Changed("email") {
+				body.Email = &emailFlag
+			}
+			if cmd.Flags().Changed("foreign-tax-id") {
+				body.ForeignTaxID = &foreignTaxIdFlag
+			}
+			if cmd.Flags().Changed("municipality-code") {
+				body.MunicipalityCode = &municipalityCodeFlag
+			}
+			if cmd.Flags().Changed("neighborhood") {
+				body.Neighborhood = &neighborhoodFlag
+			}
+			if cmd.Flags().Changed("no-tax-id-reason") {
+				body.NoTaxIDReason = &noTaxIdReasonFlag
+			}
+			if cmd.Flags().Changed("phone") {
+				body.Phone = &phoneFlag
+			}
+			if cmd.Flags().Changed("postal-code") {
+				body.PostalCode = &postalCodeFlag
+			}
+			if cmd.Flags().Changed("ready") {
+				body.Ready = &readyFlag
+			}
+			if cmd.Flags().Changed("state") {
+				body.State = &stateFlag
+			}
+			if cmd.Flags().Changed("street-name") {
+				body.StreetName = &streetNameFlag
+			}
+			if cmd.Flags().Changed("street-number") {
+				body.StreetNumber = &streetNumberFlag
+			}
+			if cmd.Flags().Changed("tax-id") {
+				body.TaxID = &taxIdFlag
+			}
 			out, err := c.UpdateBillingProfile(cmd.Context(), &body)
 			if err != nil {
 				return err
@@ -397,24 +465,24 @@ func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.City, "city", "", "City")
-	f.StringVar(&body.CompanyName, "company-name", "", "Full legal name of the individual or company")
-	f.StringVar(&body.Complement, "complement", "", "Complement")
-	f.StringVar(&body.Country, "country", "", "ISO 3166-1 alpha-2 country code")
-	f.StringVar(&body.CustomerType, "customer-type", "", "Customer type (one of: , individual, company)")
-	f.StringVar(&body.Email, "email", "", "Billing email for fiscal invoice delivery")
-	f.StringVar(&body.ForeignTaxID, "foreign-tax-id", "", "Foreign identifier; not validated as a Brazilian document")
+	f.StringVar(&cityFlag, "city", "", "City")
+	f.StringVar(&companyNameFlag, "company-name", "", "Full legal name of the individual or company")
+	f.StringVar(&complementFlag, "complement", "", "Complement")
+	f.StringVar(&countryFlag, "country", "", "ISO 3166-1 alpha-2 country code")
+	f.StringVar(&customerTypeFlag, "customer-type", "", "Customer type (one of: , individual, company)")
+	f.StringVar(&emailFlag, "email", "", "Billing email for fiscal invoice delivery")
+	f.StringVar(&foreignTaxIdFlag, "foreign-tax-id", "", "Foreign identifier; not validated as a Brazilian document")
 	f.StringSliceVar(&body.MissingFields, "missing-fields", nil, "Missing fields")
-	f.StringVar(&body.MunicipalityCode, "municipality-code", "", "Seven-digit IBGE municipality code, required for a Brazilian recipient")
-	f.StringVar(&body.Neighborhood, "neighborhood", "", "Neighborhood")
-	f.StringVar(&body.NoTaxIDReason, "no-tax-id-reason", "", "Required for a foreign recipient without a tax identifier")
-	f.StringVar(&body.Phone, "phone", "", "Phone")
-	f.StringVar(&body.PostalCode, "postal-code", "", "Eight-digit CEP for Brazil; optional international postal code abroad")
-	f.BoolVar(&body.Ready, "ready", false, "Ready")
-	f.StringVar(&body.State, "state", "", "Two-letter UF for Brazil; free-form state/province abroad")
-	f.StringVar(&body.StreetName, "street-name", "", "Street name")
-	f.StringVar(&body.StreetNumber, "street-number", "", "Street number")
-	f.StringVar(&body.TaxID, "tax-id", "", "CPF for a Brazilian individual or CNPJ for a Brazilian company")
+	f.StringVar(&municipalityCodeFlag, "municipality-code", "", "Seven-digit IBGE municipality code, required for a Brazilian recipient")
+	f.StringVar(&neighborhoodFlag, "neighborhood", "", "Neighborhood")
+	f.StringVar(&noTaxIdReasonFlag, "no-tax-id-reason", "", "Required for a foreign recipient without a tax identifier")
+	f.StringVar(&phoneFlag, "phone", "", "Phone")
+	f.StringVar(&postalCodeFlag, "postal-code", "", "Eight-digit CEP for Brazil; optional international postal code abroad")
+	f.BoolVar(&readyFlag, "ready", false, "Ready")
+	f.StringVar(&stateFlag, "state", "", "Two-letter UF for Brazil; free-form state/province abroad")
+	f.StringVar(&streetNameFlag, "street-name", "", "Street name")
+	f.StringVar(&streetNumberFlag, "street-number", "", "Street number")
+	f.StringVar(&taxIdFlag, "tax-id", "", "CPF for a Brazilian individual or CNPJ for a Brazilian company")
 	return cmd
 }
 
