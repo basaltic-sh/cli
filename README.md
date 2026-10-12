@@ -266,3 +266,21 @@ shape works for load balancers and supports custom telemetry metrics. Set
 `enabled` to `false` to retain the policy while using manual sizing. Explicit
 zero and false values are preserved; omitted fields retain their API semantics.
 `--replica-count` remains the deprecated alias for load-balancer desired count.
+
+### KMS key rotation
+
+Configure automatic rotation or request a rotation without changing the key ID:
+
+```sh
+basaltic kms key set-rotation <key-id> --enabled=true --rotation-period-days 90
+basaltic kms key rotate <key-id> --idempotency-key <unique-request-token>
+basaltic kms key rotation-status <key-id>
+basaltic kms key list-rotations <key-id>
+```
+
+Reuse the same request token after a timeout. A pending response is durable;
+poll it with `kms key get-rotation <key-id> <rotation-id>`. Existing ciphertext
+continues to decrypt. Persist the `key_version` returned by signing and pass
+`--key-version` to verification or public-key retrieval. See the
+[key rotation guide](https://docs.basaltic.sh/kms/rotation) for policy timing,
+history, public keys, and ciphertext rewrap.

@@ -58,7 +58,14 @@ func newKmsKeyCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newKmsKeyEnableCommand(state))
 	cmd.AddCommand(newKmsKeyEncryptCommand(state))
 	cmd.AddCommand(newKmsKeyGenerateDataKeyCommand(state))
+	cmd.AddCommand(newKmsKeyGetRotationCommand(state))
+	cmd.AddCommand(newKmsKeyListRotationsCommand(state))
+	cmd.AddCommand(newKmsKeyPublicKeyCommand(state))
+	cmd.AddCommand(newKmsKeyRewrapCommand(state))
+	cmd.AddCommand(newKmsKeyRotateCommand(state))
+	cmd.AddCommand(newKmsKeyRotationStatusCommand(state))
 	cmd.AddCommand(newKmsKeyScheduleDeletionCommand(state))
+	cmd.AddCommand(newKmsKeySetRotationCommand(state))
 	cmd.AddCommand(newKmsKeySignCommand(state))
 	cmd.AddCommand(newKmsKeyVerifyCommand(state))
 	return cmd
@@ -434,6 +441,179 @@ func newKmsKeyGenerateDataKeyCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newKmsKeyGetRotationCommand builds `basaltic kms key get-rotation`.
+func newKmsKeyGetRotationCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-rotation <key-id> <rotation-id>",
+		Short: "Get a key rotation",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rotations/{rotation_id}")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetKeyRotation(cmd.Context(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newKmsKeyListRotationsCommand builds `basaltic kms key list-rotations`.
+func newKmsKeyListRotationsCommand(state *cli.State) *cobra.Command {
+	var params kms.ListKeyRotationsParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-rotations <key-id>",
+		Short: "List key rotation history",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List key rotation history.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rotations")
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListKeyRotationsAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListKeyRotations(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Marker")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
+// newKmsKeyPublicKeyCommand builds `basaltic kms key public-key`.
+func newKmsKeyPublicKeyCommand(state *cli.State) *cobra.Command {
+	var params kms.GetPublicKeyParams
+	cmd := &cobra.Command{
+		Use:   "public-key <key-id>",
+		Short: "Get a versioned public key",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/public-key")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetPublicKey(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.IntVar(&params.KeyVersion, "key-version", 0, "Material version to export")
+	return cmd
+}
+
+// newKmsKeyRewrapCommand builds `basaltic kms key rewrap`.
+func newKmsKeyRewrapCommand(state *cli.State) *cobra.Command {
+	var body kms.RewrapRequest
+	var bodyFile string
+	var ciphertextFlag string
+	cmd := &cobra.Command{
+		Use:   "rewrap <key-id>",
+		Short: "Rewrap ciphertext with current key material",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"ciphertext": "ciphertext",
+			}, []string{"ciphertext"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rewrap")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("ciphertext") {
+				decoded, err := base64.StdEncoding.DecodeString(ciphertextFlag)
+				if err != nil {
+					return fmt.Errorf("--ciphertext: invalid base64: %w", err)
+				}
+				body.Ciphertext = decoded
+			}
+			out, err := c.Rewrap(cmd.Context(), args[0], &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&ciphertextFlag, "ciphertext", "", "Base64-encoded ciphertext or wrapped data key produced by this KMS key")
+	return cmd
+}
+
+// newKmsKeyRotateCommand builds `basaltic kms key rotate`.
+func newKmsKeyRotateCommand(state *cli.State) *cobra.Command {
+	var idempotencyKey string
+	cmd := &cobra.Command{
+		Use:   "rotate <key-id>",
+		Short: "Rotate key material now",
+		Args:  cobra.ExactArgs(1),
+		Long:  "Rotate key material now.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rotate")
+			if err != nil {
+				return err
+			}
+			var reqOpts []basaltic.RequestOption
+			if idempotencyKey != "" {
+				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
+			}
+			out, err := c.RotateKeyOnDemand(cmd.Context(), args[0], reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
+	return cmd
+}
+
+// newKmsKeyRotationStatusCommand builds `basaltic kms key rotation-status`.
+func newKmsKeyRotationStatusCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "rotation-status <key-id>",
+		Short: "Get key rotation status",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rotation")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetKeyRotationStatus(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
 // newKmsKeyScheduleDeletionCommand builds `basaltic kms key schedule-deletion`.
 func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 	var body kms.ScheduleKeyDeletionRequest
@@ -467,6 +647,44 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
 	f.IntVar(&recoveryWindowDaysFlag, "recovery-window-days", 0, "How long the key sits in pending_deletion before it is hard-deleted")
+	return cmd
+}
+
+// newKmsKeySetRotationCommand builds `basaltic kms key set-rotation`.
+func newKmsKeySetRotationCommand(state *cli.State) *cobra.Command {
+	var body kms.SetKeyRotationRequest
+	var bodyFile string
+	var rotationPeriodDaysFlag int
+	cmd := &cobra.Command{
+		Use:   "set-rotation <key-id>",
+		Short: "Configure automatic key rotation",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"enabled":              "enabled",
+				"rotation_period_days": "rotation-period-days",
+			}, []string{"enabled"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := kmsClient(state, "/v1/keys/{key_id}/rotation")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("rotation-period-days") {
+				body.RotationPeriodDays = &rotationPeriodDaysFlag
+			}
+			out, err := c.SetKeyRotation(cmd.Context(), args[0], &body)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&body.Enabled, "enabled", false, "Enabled")
+	f.IntVar(&rotationPeriodDaysFlag, "rotation-period-days", 0, "Whole days between rotations")
 	return cmd
 }
 
@@ -520,6 +738,7 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 	var body kms.VerifyRequest
 	var bodyFile string
+	var keyVersionFlag int
 	var messageFlag string
 	var signatureFlag string
 	var signingAlgorithmFlag string
@@ -529,6 +748,7 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"key_version":       "key-version",
 				"message":           "message",
 				"signature":         "signature",
 				"signing_algorithm": "signing-algorithm",
@@ -538,6 +758,9 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 			c, err := kmsClient(state, "/v1/keys/{key_id}/verify")
 			if err != nil {
 				return err
+			}
+			if cmd.Flags().Changed("key-version") {
+				body.KeyVersion = &keyVersionFlag
 			}
 			if cmd.Flags().Changed("message") {
 				decoded, err := base64.StdEncoding.DecodeString(messageFlag)
@@ -566,6 +789,7 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.IntVar(&keyVersionFlag, "key-version", 0, "Optional material version returned by Sign")
 	f.StringVar(&messageFlag, "message", "", "Base64-encoded original message")
 	f.StringVar(&signatureFlag, "signature", "", "Base64-encoded signature produced by Sign")
 	f.StringVar(&signingAlgorithmFlag, "signing-algorithm", "", "Signing algorithm (one of: RSASSA_PSS_SHA_256, RSASSA_PKCS1_V1_5_SHA_256, ECDSA_SHA_256)")
