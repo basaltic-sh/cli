@@ -77,9 +77,9 @@ basaltic <service> <resource> <verb> [flags]
 ```bash
 basaltic compute instance list
 basaltic compute instance start i-abc123
-basaltic network vpc create --name prod --cidr-v4 10.0.0.0/16
+basaltic network vpc create --name prod --cidr-ipv4 10.0.0.0/16
 basaltic storage volume list
-basaltic loadbalancer listener create lb-1 --port 443
+basaltic loadbalancer listener create <load-balancer-id> --protocol https --port 443 --certificates <certificate-id>
 basaltic workspace user list
 ```
 
@@ -105,7 +105,7 @@ Longer service names have short aliases, and every resource accepts its
 plural:
 
 ```bash
-basaltic lb listener list        # loadbalancer
+basaltic lb listener list <load-balancer-id> # loadbalancer
 basaltic net vpc list            # network
 basaltic compute instances list  # same as `instance`
 ```
@@ -164,9 +164,9 @@ object has no honest flat representation:
 ```bash
 basaltic compute instance create \
   --name web-01 \
-  --flavor-id f-1 \
-  --image-id debian-13 \
-  --networks '[{"subnet_id":"sn-1","assign_public_ip":true}]'
+  --flavor f-1 \
+  --image debian-13 \
+  --networks '[{"subnet":"sn-1","floating_ip_assignment":"ipv4"}]'
 ```
 
 For anything more than that, `--from-file` takes the whole body as JSON or
@@ -176,6 +176,13 @@ YAML, and flags override individual fields of it:
 basaltic compute instance create --from-file instance.yaml --name web-02
 ```
 
+Explicit `null` in a JSON or YAML body clears nullable fields in PATCH requests.
+Omitted fields stay unchanged; a command flag overrides the file, including null.
+
+```bash
+echo '{"retention_days":null}' | basaltic telemetry log-group update <log-group-id> --from-file -
+```
+
 ### Retrying a create
 
 A create that times out may already have succeeded, so the CLI will not
@@ -183,7 +190,7 @@ repeat one on its own. Give it a key and it becomes safe to retry — the
 platform returns the original outcome instead of building a second resource:
 
 ```bash
-basaltic compute instance create --name web-01 --flavor-id f-1 \
+basaltic compute instance create --name web-01 --flavor f-1 \
   --idempotency-key "$(uuidgen)"
 ```
 

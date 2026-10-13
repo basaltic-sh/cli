@@ -165,6 +165,7 @@ func newSecretsSecretCreateCommand(state *cli.State) *cobra.Command {
 				body.Value = decoded
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -217,7 +218,9 @@ func newSecretsSecretUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateSecret(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateSecret(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -254,7 +257,9 @@ func newSecretsSecretDeleteCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
-			out, err := c.DeleteSecret(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.DeleteSecret(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -385,6 +390,7 @@ func newSecretsSecretSetValueCommand(state *cli.State) *cobra.Command {
 				body.Value = decoded
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}

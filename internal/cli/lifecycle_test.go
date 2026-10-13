@@ -39,7 +39,7 @@ func TestLifecycleRevisionRoundTrip(t *testing.T) {
 		if r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("ETag", `"revision-1"`)
-			fmt.Fprint(w, `{"lifecycle":{"rules":[]},"revision":"revision-1"}`)
+			fmt.Fprint(w, `{"lifecycle_rules":[],"revision":"revision-1"}`)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -59,12 +59,10 @@ func TestLifecycleRevisionRoundTrip(t *testing.T) {
 		t.Fatalf("get: %v: %s", err, out)
 	}
 	var result struct {
-		Revision  string `json:"revision"`
-		Lifecycle struct {
-			Rules []json.RawMessage `json:"rules"`
-		} `json:"lifecycle"`
+		Revision       string            `json:"revision"`
+		LifecycleRules []json.RawMessage `json:"lifecycle_rules"`
 	}
-	if err := json.Unmarshal(out, &result); err != nil || result.Revision != "revision-1" || result.Lifecycle.Rules == nil {
+	if err := json.Unmarshal(out, &result); err != nil || result.Revision != "revision-1" || result.LifecycleRules == nil {
 		t.Fatalf("revision missing from output: %s (%v)", out, err)
 	}
 	if got := <-requests; got != "GET " {
@@ -74,7 +72,7 @@ func TestLifecycleRevisionRoundTrip(t *testing.T) {
 		args := []string{verb, "example"}
 		method := "DELETE"
 		if verb == "set-lifecycle" {
-			args = append(args, "--lifecycle", `{"rules":[]}`)
+			args = append(args, "--lifecycle-rules", `[]`)
 			method = "PUT"
 		}
 		out, err := run(args...)
@@ -116,8 +114,8 @@ func TestLifecycleDatesRemainOptional(t *testing.T) {
 			if err := os.WriteFile(config, []byte("profiles:\n  default:\n    region: test-region\n    endpoints:\n      storage: "+server.URL+"\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			lifecycle := `{"rules":[` + rule + `]}`
-			cmd := exec.Command(os.Args[0], "-test.run=^TestLifecycleCLIProcess$", "--", "storage", "bucket", "set-lifecycle", "example", "--revision", "revision-1", "--lifecycle", lifecycle)
+			lifecycle := `[` + rule + `]`
+			cmd := exec.Command(os.Args[0], "-test.run=^TestLifecycleCLIProcess$", "--", "storage", "bucket", "set-lifecycle", "example", "--revision", "revision-1", "--lifecycle-rules", lifecycle)
 			cmd.Env = append(os.Environ(), "BASALTIC_LIFECYCLE_TEST_PROCESS=1", "BASALTIC_CONFIG_FILE="+config, "BASALTIC_PROFILE=default", "BASALTIC_ACCESS_TOKEN=test-only", "BASALTIC_NO_UPDATE_CHECK=1")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("CLI: %v %s", err, out)
@@ -126,7 +124,7 @@ func TestLifecycleDatesRemainOptional(t *testing.T) {
 			if err := json.Unmarshal(<-wire, &got); err != nil {
 				t.Fatal(err)
 			}
-			if err := json.Unmarshal([]byte(`{"lifecycle":`+lifecycle+`}`), &want); err != nil {
+			if err := json.Unmarshal([]byte(`{"lifecycle_rules":`+lifecycle+`}`), &want); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(got, want) {

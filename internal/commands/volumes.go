@@ -5,7 +5,7 @@ import (
 	"github.com/basaltic-sh/sdk-go/compute"
 )
 
-func init() { output.Present(compute.ListInstanceVolumesAttachment{}, volumeAttachmentRow) }
+func init() { output.Present(compute.AttachedVolume{}, volumeAttachmentRow) }
 
 // volumeAttachmentRow is the table row for `compute instance list-volumes`.
 //
@@ -23,11 +23,11 @@ func init() { output.Present(compute.ListInstanceVolumesAttachment{}, volumeAtta
 //   - `message` is free text from inside the customer's guest. It is not in
 //     the table (one line per row); json and yaml carry it, as text.
 func volumeAttachmentRow(v any) []output.Field {
-	var a *compute.ListInstanceVolumesAttachment
+	var a *compute.AttachedVolume
 	switch t := v.(type) {
-	case *compute.ListInstanceVolumesAttachment:
+	case *compute.AttachedVolume:
 		a = t
-	case compute.ListInstanceVolumesAttachment:
+	case compute.AttachedVolume:
 		a = &t
 	}
 	state, code := "", ""
@@ -43,7 +43,7 @@ func volumeAttachmentRow(v any) []output.Field {
 		state, code = a.Mount.State, a.Mount.Code
 	}
 	return []output.Field{
-		{Key: "volume_id", Value: a.VolumeID},
+		{Key: "id", Value: a.ID},
 		{Key: "name", Value: a.Name},
 		{Key: "status", Value: a.Status},
 		{Key: "device", Value: a.Device},

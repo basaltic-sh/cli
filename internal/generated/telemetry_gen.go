@@ -31,6 +31,7 @@ func newTelemetryCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newTelemetryLogCommand(state))
 	cmd.AddCommand(newTelemetryLogGroupCommand(state))
 	cmd.AddCommand(newTelemetryMetricCommand(state))
+	cmd.AddCommand(newTelemetryRetainedDataCommand(state))
 	cmd.AddCommand(newTelemetrySpanCommand(state))
 	cmd.AddCommand(newTelemetryTraceCommand(state))
 	cmd.AddCommand(newTelemetryTraceSettingsCommand(state))
@@ -164,7 +165,9 @@ func newTelemetryLogIngestCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--logs: %w", err)
 				}
 			}
-			out, err := c.IngestLogs(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.IngestLogs(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -295,6 +298,7 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -311,7 +315,7 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
-	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650, or omit for never expire")
+	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Retention in days (one of: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653, <nil>)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
@@ -321,7 +325,6 @@ func newTelemetryLogGroupCreateCommand(state *cli.State) *cobra.Command {
 func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 	var body telemetry.UpdateLogGroupRequest
 	var bodyFile string
-	var clearRetentionFlag bool
 	var descriptionFlag string
 	var kmsKeyFlag string
 	var retentionDaysFlag int
@@ -332,20 +335,16 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"clear_retention": "clear-retention",
-				"description":     "description",
-				"kms_key":         "kms-key",
-				"retention_days":  "retention-days",
-				"tags":            "tags",
+				"description":    "description",
+				"kms_key":        "kms-key",
+				"retention_days": "retention-days",
+				"tags":           "tags",
 			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/log-groups/{id}")
 			if err != nil {
 				return err
-			}
-			if cmd.Flags().Changed("clear-retention") {
-				body.ClearRetention = &clearRetentionFlag
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -361,7 +360,9 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateLogGroup(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateLogGroup(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -371,10 +372,9 @@ func newTelemetryLogGroupUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&clearRetentionFlag, "clear-retention", false, "When true, sets retention to never-expire (ignores retention_days)")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
-	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650; pass clear_retention to switch to never expire")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in this account and region")
+	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Omit to preserve retention (one of: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653, <nil>)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
 }
@@ -424,118 +424,172 @@ func newTelemetryMetricCommand(state *cli.State) *cobra.Command {
 // newTelemetryMetricListNamesCommand builds `basaltic telemetry metric list-names`.
 func newTelemetryMetricListNamesCommand(state *cli.State) *cobra.Command {
 	var params telemetry.ListMetricNamesParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list-names",
-		Short: "List the distinct metric names emitted in a time window",
+		Short: "List metric names",
 		Args:  cobra.ExactArgs(0),
+		Long:  "List metric names.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/names")
 			if err != nil {
 				return err
 			}
-			out, err := c.ListMetricNames(cmd.Context(), &params)
+			if fetchAll {
+				return state.Printer().Iter(c.ListMetricNamesAll(cmd.Context(), &params))
+			}
+			page, err := c.ListMetricNames(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.End, "end", "", "End")
 	_ = cmd.MarkFlagRequired("end")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Start, "start", "", "Start")
 	_ = cmd.MarkFlagRequired("start")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newTelemetryMetricListNamesBodyCommand builds `basaltic telemetry metric list-names-body`.
 func newTelemetryMetricListNamesBodyCommand(state *cli.State) *cobra.Command {
+	var body telemetry.ListMetricNamesPostRequest
 	var bodyFile string
+	var limitFlag int
+	var markerFlag string
 	cmd := &cobra.Command{
 		Use:   "list-names-body",
-		Short: "List the distinct metric names emitted in a time window (form body)",
+		Short: "List metric names (JSON)",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"end":    "end",
+				"limit":  "limit",
+				"marker": "marker",
+				"start":  "start",
+			}, []string{"end", "start"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/names")
 			if err != nil {
 				return err
 			}
-			reader, closeBody, err := openBody(bodyFile)
+			if cmd.Flags().Changed("limit") {
+				body.Limit = &limitFlag
+			}
+			if cmd.Flags().Changed("marker") {
+				body.Marker = &markerFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			page, err := c.ListMetricNamesPost(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
-			defer closeBody()
-			out, err := c.ListMetricNamesPost(cmd.Context(), reader)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVarP(&bodyFile, "file", "f", "-", "File to send as the request body, or - for stdin.")
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.End, "end", "", "End")
+	f.IntVar(&limitFlag, "limit", 0, "Limit")
+	f.StringVar(&markerFlag, "marker", "", "Marker")
+	f.StringVar(&body.Start, "start", "", "Start")
 	return cmd
 }
 
 // newTelemetryMetricListSeriesCommand builds `basaltic telemetry metric list-series`.
 func newTelemetryMetricListSeriesCommand(state *cli.State) *cobra.Command {
 	var params telemetry.ListMetricSeriesParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list-series",
-		Short: "List distinct label sets for a metric",
+		Short: "List metric series",
 		Args:  cobra.ExactArgs(0),
+		Long:  "List metric series.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/series")
 			if err != nil {
 				return err
 			}
-			out, err := c.ListMetricSeries(cmd.Context(), &params)
+			if fetchAll {
+				return state.Printer().Iter(c.ListMetricSeriesAll(cmd.Context(), &params))
+			}
+			page, err := c.ListMetricSeries(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.End, "end", "", "End")
 	_ = cmd.MarkFlagRequired("end")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Metric, "metric", "", "Metric")
 	_ = cmd.MarkFlagRequired("metric")
 	f.StringVar(&params.Start, "start", "", "Start")
 	_ = cmd.MarkFlagRequired("start")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
 // newTelemetryMetricListSeriesBodyCommand builds `basaltic telemetry metric list-series-body`.
 func newTelemetryMetricListSeriesBodyCommand(state *cli.State) *cobra.Command {
+	var body telemetry.ListMetricSeriesPostRequest
 	var bodyFile string
+	var limitFlag int
+	var markerFlag string
 	cmd := &cobra.Command{
 		Use:   "list-series-body",
-		Short: "List distinct label sets for a metric (form body)",
+		Short: "List metric series (JSON)",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"end":    "end",
+				"limit":  "limit",
+				"marker": "marker",
+				"metric": "metric",
+				"start":  "start",
+			}, []string{"end", "metric", "start"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/series")
 			if err != nil {
 				return err
 			}
-			reader, closeBody, err := openBody(bodyFile)
+			if cmd.Flags().Changed("limit") {
+				body.Limit = &limitFlag
+			}
+			if cmd.Flags().Changed("marker") {
+				body.Marker = &markerFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			page, err := c.ListMetricSeriesPost(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
-			defer closeBody()
-			out, err := c.ListMetricSeriesPost(cmd.Context(), reader)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVarP(&bodyFile, "file", "f", "-", "File to send as the request body, or - for stdin.")
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.End, "end", "", "End")
+	f.IntVar(&limitFlag, "limit", 0, "Limit")
+	f.StringVar(&markerFlag, "marker", "", "Marker")
+	f.StringVar(&body.Metric, "metric", "", "Metric")
+	f.StringVar(&body.Start, "start", "", "Start")
 	return cmd
 }
 
@@ -544,7 +598,7 @@ func newTelemetryMetricQueryCommand(state *cli.State) *cobra.Command {
 	var params telemetry.QueryMetricsInstantParams
 	cmd := &cobra.Command{
 		Use:   "query",
-		Short: "Instant structured metric query",
+		Short: "Run an instant metric query",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/query")
@@ -561,7 +615,6 @@ func newTelemetryMetricQueryCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.Agg, "agg", "", "Aggregation One of: \"avg\", \"sum\", \"min\", \"max\", \"count\", \"last\", \"rate\", \"increase\"")
-	_ = cmd.MarkFlagRequired("agg")
 	f.StringSliceVar(&params.By, "by", nil, "Group-by label names")
 	f.StringSliceVar(&params.Match, "match", nil, "Label matchers (e.g")
 	f.StringVar(&params.Metric, "metric", "", "Metric name")
@@ -573,22 +626,42 @@ func newTelemetryMetricQueryCommand(state *cli.State) *cobra.Command {
 
 // newTelemetryMetricQueryBodyCommand builds `basaltic telemetry metric query-body`.
 func newTelemetryMetricQueryBodyCommand(state *cli.State) *cobra.Command {
+	var body telemetry.QueryMetricsInstantPostRequest
 	var bodyFile string
+	var aggFlag string
+	var stepFlag string
+	var timeFlag string
 	cmd := &cobra.Command{
 		Use:   "query-body",
-		Short: "Instant structured metric query (form body)",
+		Short: "Run an instant metric query (JSON)",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"agg":    "agg",
+				"by":     "by",
+				"match":  "match",
+				"metric": "metric",
+				"step":   "step",
+				"time":   "time",
+			}, []string{"metric"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/metrics/query")
 			if err != nil {
 				return err
 			}
-			reader, closeBody, err := openBody(bodyFile)
-			if err != nil {
-				return err
+			if cmd.Flags().Changed("agg") {
+				body.Agg = &aggFlag
 			}
-			defer closeBody()
-			out, err := c.QueryMetricsInstantPost(cmd.Context(), reader)
+			if cmd.Flags().Changed("step") {
+				body.Step = &stepFlag
+			}
+			if cmd.Flags().Changed("time") {
+				body.Time = &timeFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.QueryMetricsInstantPost(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -597,7 +670,13 @@ func newTelemetryMetricQueryBodyCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVarP(&bodyFile, "file", "f", "-", "File to send as the request body, or - for stdin.")
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&aggFlag, "agg", "", "Agg (one of: avg, sum, min, max, count, last, rate, increase)")
+	f.StringSliceVar(&body.By, "by", nil, "By")
+	f.StringSliceVar(&body.Match, "match", nil, "Match")
+	f.StringVar(&body.Metric, "metric", "", "Metric")
+	f.StringVar(&stepFlag, "step", "", "Step")
+	f.StringVar(&timeFlag, "time", "", "Time")
 	return cmd
 }
 
@@ -606,10 +685,10 @@ func newTelemetryMetricQueryRangeCommand(state *cli.State) *cobra.Command {
 	var params telemetry.QueryMetricsRangeParams
 	cmd := &cobra.Command{
 		Use:   "query-range",
-		Short: "Range structured metric query",
+		Short: "Run a range metric query",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state, "/v1/metrics/query_range")
+			c, err := telemetryClient(state, "/v1/metrics/query-range")
 			if err != nil {
 				return err
 			}
@@ -623,7 +702,6 @@ func newTelemetryMetricQueryRangeCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.Agg, "agg", "", "One of: \"avg\", \"sum\", \"min\", \"max\", \"count\", \"last\", \"rate\", \"increase\"")
-	_ = cmd.MarkFlagRequired("agg")
 	f.StringSliceVar(&params.By, "by", nil, "By")
 	f.StringVar(&params.End, "end", "", "End")
 	_ = cmd.MarkFlagRequired("end")
@@ -638,22 +716,39 @@ func newTelemetryMetricQueryRangeCommand(state *cli.State) *cobra.Command {
 
 // newTelemetryMetricQueryRangeBodyCommand builds `basaltic telemetry metric query-range-body`.
 func newTelemetryMetricQueryRangeBodyCommand(state *cli.State) *cobra.Command {
+	var body telemetry.QueryMetricsRangePostRequest
 	var bodyFile string
+	var aggFlag string
+	var stepFlag string
 	cmd := &cobra.Command{
 		Use:   "query-range-body",
-		Short: "Range structured metric query (form body)",
+		Short: "Run a range metric query (JSON)",
 		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"agg":    "agg",
+				"by":     "by",
+				"end":    "end",
+				"match":  "match",
+				"metric": "metric",
+				"start":  "start",
+				"step":   "step",
+			}, []string{"end", "metric", "start"})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state, "/v1/metrics/query_range")
+			c, err := telemetryClient(state, "/v1/metrics/query-range")
 			if err != nil {
 				return err
 			}
-			reader, closeBody, err := openBody(bodyFile)
-			if err != nil {
-				return err
+			if cmd.Flags().Changed("agg") {
+				body.Agg = &aggFlag
 			}
-			defer closeBody()
-			out, err := c.QueryMetricsRangePost(cmd.Context(), reader)
+			if cmd.Flags().Changed("step") {
+				body.Step = &stepFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.QueryMetricsRangePost(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -662,7 +757,14 @@ func newTelemetryMetricQueryRangeBodyCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVarP(&bodyFile, "file", "f", "-", "File to send as the request body, or - for stdin.")
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&aggFlag, "agg", "", "Agg (one of: avg, sum, min, max, count, last, rate, increase)")
+	f.StringSliceVar(&body.By, "by", nil, "By")
+	f.StringVar(&body.End, "end", "", "End")
+	f.StringSliceVar(&body.Match, "match", nil, "Match")
+	f.StringVar(&body.Metric, "metric", "", "Metric")
+	f.StringVar(&body.Start, "start", "", "Start")
+	f.StringVar(&stepFlag, "step", "", "Step")
 	return cmd
 }
 
@@ -693,6 +795,40 @@ func newTelemetryMetricWriteCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "file", "f", "-", "File to send as the request body, or - for stdin.")
+	return cmd
+}
+
+// newTelemetryRetainedDataCommand builds `basaltic telemetry retained-data`.
+func newTelemetryRetainedDataCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "retained-data",
+		Short:   "Retained datas",
+		Aliases: []string{"retained-datas"},
+	}
+	cmd.AddCommand(newTelemetryRetainedDataGetCommand(state))
+	return cmd
+}
+
+// newTelemetryRetainedDataGetCommand builds `basaltic telemetry retained-data get`.
+func newTelemetryRetainedDataGetCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get",
+		Short: "Check retained telemetry presence",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/retained-data")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetRetainedTelemetryPresence(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
@@ -731,7 +867,9 @@ func newTelemetrySpanIngestCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--spans: %w", err)
 				}
 			}
-			out, err := c.IngestSpans(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.IngestSpans(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -754,6 +892,7 @@ func newTelemetryTraceCommand(state *cli.State) *cobra.Command {
 	}
 	cmd.AddCommand(newTelemetryTraceListCommand(state))
 	cmd.AddCommand(newTelemetryTraceGetCommand(state))
+	cmd.AddCommand(newTelemetryTraceListSpansCommand(state))
 	return cmd
 }
 
@@ -817,7 +956,7 @@ func newTelemetryTraceListCommand(state *cli.State) *cobra.Command {
 func newTelemetryTraceGetCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <trace-id>",
-		Short: "Get all spans for a trace",
+		Short: "Get a trace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := telemetryClient(state, "/v1/traces/{trace_id}")
@@ -836,6 +975,38 @@ func newTelemetryTraceGetCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newTelemetryTraceListSpansCommand builds `basaltic telemetry trace list-spans`.
+func newTelemetryTraceListSpansCommand(state *cli.State) *cobra.Command {
+	var params telemetry.ListTraceSpansParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-spans <trace-id>",
+		Short: "List spans in a trace",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List spans in a trace.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/traces/{trace_id}/spans")
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListTraceSpansAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListTraceSpans(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
 // newTelemetryTraceSettingsCommand builds `basaltic telemetry trace-settings`.
 func newTelemetryTraceSettingsCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -844,9 +1015,8 @@ func newTelemetryTraceSettingsCommand(state *cli.State) *cobra.Command {
 		Aliases: []string{"trace-settingses"},
 	}
 	cmd.AddCommand(newTelemetryTraceSettingsGetCommand(state))
+	cmd.AddCommand(newTelemetryTraceSettingsUpdateCommand(state))
 	cmd.AddCommand(newTelemetryTraceSettingsDeleteCommand(state))
-	cmd.AddCommand(newTelemetryTraceSettingsGetRetainedDataCommand(state))
-	cmd.AddCommand(newTelemetryTraceSettingsSetCommand(state))
 	return cmd
 }
 
@@ -873,6 +1043,50 @@ func newTelemetryTraceSettingsGetCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newTelemetryTraceSettingsUpdateCommand builds `basaltic telemetry trace-settings update`.
+func newTelemetryTraceSettingsUpdateCommand(state *cli.State) *cobra.Command {
+	var body telemetry.UpdateTraceSettingsRequest
+	var bodyFile string
+	var kmsKeyFlag string
+	var retentionDaysFlag int
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update the caller account's trace settings",
+		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"kms_key":        "kms-key",
+				"retention_days": "retention-days",
+			}, []string{})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/trace-settings")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("kms-key") {
+				body.KMSKey = &kmsKeyFlag
+			}
+			if cmd.Flags().Changed("retention-days") {
+				body.RetentionDays = &retentionDaysFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateTraceSettings(cmd.Context(), &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in this account and region")
+	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Omit to preserve retention (one of: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653, <nil>)")
+	return cmd
+}
+
 // newTelemetryTraceSettingsDeleteCommand builds `basaltic telemetry trace-settings delete`.
 func newTelemetryTraceSettingsDeleteCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -893,76 +1107,5 @@ func newTelemetryTraceSettingsDeleteCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	return cmd
-}
-
-// newTelemetryTraceSettingsGetRetainedDataCommand builds `basaltic telemetry trace-settings get-retained-data`.
-func newTelemetryTraceSettingsGetRetainedDataCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get-retained-data",
-		Short: "Check retained telemetry presence",
-		Args:  cobra.ExactArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state, "/v1/trace-settings/retained-data")
-			if err != nil {
-				return err
-			}
-			out, err := c.GetRetainedTelemetryPresence(cmd.Context())
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	return cmd
-}
-
-// newTelemetryTraceSettingsSetCommand builds `basaltic telemetry trace-settings set`.
-func newTelemetryTraceSettingsSetCommand(state *cli.State) *cobra.Command {
-	var body telemetry.UpdateTraceSettingsRequest
-	var bodyFile string
-	var clearRetentionFlag bool
-	var kmsKeyFlag string
-	var retentionDaysFlag int
-	cmd := &cobra.Command{
-		Use:   "set",
-		Short: "Update the caller account's trace settings",
-		Args:  cobra.ExactArgs(0),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"clear_retention": "clear-retention",
-				"kms_key":         "kms-key",
-				"retention_days":  "retention-days",
-			}, []string{})
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := telemetryClient(state, "/v1/trace-settings")
-			if err != nil {
-				return err
-			}
-			if cmd.Flags().Changed("clear-retention") {
-				body.ClearRetention = &clearRetentionFlag
-			}
-			if cmd.Flags().Changed("kms-key") {
-				body.KMSKey = &kmsKeyFlag
-			}
-			if cmd.Flags().Changed("retention-days") {
-				body.RetentionDays = &retentionDaysFlag
-			}
-			out, err := c.PutTraceSettings(cmd.Context(), &body)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&clearRetentionFlag, "clear-retention", false, "When true, sets retention to never-expire (ignores retention_days)")
-	f.StringVar(&kmsKeyFlag, "kms-key", "", "KMS key UUID, CRN or exact name in the authenticated account and serving region")
-	f.IntVar(&retentionDaysFlag, "retention-days", 0, "1..3650; pass clear_retention=true to switch to never-expire")
 	return cmd
 }

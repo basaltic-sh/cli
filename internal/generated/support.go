@@ -5,6 +5,7 @@
 package generated
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/basaltic-sh/cli/internal/progress"
+	basaltic "github.com/basaltic-sh/sdk-go"
 	"github.com/spf13/cobra"
 
 	"gopkg.in/yaml.v3"
@@ -88,6 +90,13 @@ func prepareBody(cmd *cobra.Command, path string, v any, fields map[string]strin
 			delete(values, wire)
 		}
 	}
+	var nullFields []string
+	for wire, value := range values {
+		if _, known := fields[wire]; known && strings.TrimSpace(string(value)) == "null" {
+			nullFields = append(nullFields, wire)
+		}
+	}
+	cmd.SetContext(context.WithValue(cmd.Context(), nullFieldsKey{}, nullFields))
 	if path != "" {
 		data, err := json.Marshal(values)
 		if err != nil {
@@ -98,6 +107,16 @@ func prepareBody(cmd *cobra.Command, path string, v any, fields map[string]strin
 		}
 	}
 	return nil
+}
+
+type nullFieldsKey struct{}
+
+func bodyRequestOptions(cmd *cobra.Command) []basaltic.RequestOption {
+	fields, _ := cmd.Context().Value(nullFieldsKey{}).([]string)
+	if len(fields) == 0 {
+		return nil
+	}
+	return []basaltic.RequestOption{basaltic.WithNullFields(fields...)}
 }
 
 // openBody returns a reader for an operation whose body is raw bytes,

@@ -18,19 +18,19 @@ func cell(fields []output.Field, key string) string {
 
 func TestVolumeRowSaysWhenNothingHasReported(t *testing.T) {
 	// An instance older than the reporting agent: mount_path set, no report.
-	fields := volumeAttachmentRow(&compute.ListInstanceVolumesAttachment{VolumeID: "v-1", MountPath: "/data"})
+	fields := volumeAttachmentRow(&compute.AttachedVolume{ID: "v-1", MountPath: "/data"})
 	if got := cell(fields, "mount_state"); got != "not reported" {
 		t.Errorf("no report must read as not reported, never blank or healthy; got %q", got)
 	}
-	fields = volumeAttachmentRow(&compute.ListInstanceVolumesAttachment{VolumeID: "v-1", MountPath: "/data", Mount: &compute.VolumeMount{State: "unknown"}})
+	fields = volumeAttachmentRow(&compute.AttachedVolume{ID: "v-1", MountPath: "/data", Mount: &compute.VolumeMount{State: "unknown"}})
 	if got := cell(fields, "mount_state"); got != "not reported" {
 		t.Errorf("unknown must read as not reported; got %q", got)
 	}
 }
 
 func TestVolumeRowKeepsTheCodeOnAMountedVolume(t *testing.T) {
-	fields := volumeAttachmentRow(compute.ListInstanceVolumesAttachment{
-		VolumeID: "v-1", MountPath: "/data",
+	fields := volumeAttachmentRow(compute.AttachedVolume{
+		ID: "v-1", MountPath: "/data",
 		Mount: &compute.VolumeMount{State: "mounted", Code: "fstab_write_failed", Message: "<b>x</b>"},
 	})
 	if cell(fields, "mount_state") != "mounted" || cell(fields, "mount_code") != "fstab_write_failed" {
@@ -44,12 +44,12 @@ func TestVolumeRowKeepsTheCodeOnAMountedVolume(t *testing.T) {
 }
 
 func TestVolumeRowDistinguishesPendingFromFailedAndBareDevices(t *testing.T) {
-	pending := cell(volumeAttachmentRow(&compute.ListInstanceVolumesAttachment{MountPath: "/a", Mount: &compute.VolumeMount{State: "pending"}}), "mount_state")
-	failed := cell(volumeAttachmentRow(&compute.ListInstanceVolumesAttachment{MountPath: "/a", Mount: &compute.VolumeMount{State: "failed", Code: "mkfs_failed"}}), "mount_state")
+	pending := cell(volumeAttachmentRow(&compute.AttachedVolume{MountPath: "/a", Mount: &compute.VolumeMount{State: "pending"}}), "mount_state")
+	failed := cell(volumeAttachmentRow(&compute.AttachedVolume{MountPath: "/a", Mount: &compute.VolumeMount{State: "failed", Code: "mkfs_failed"}}), "mount_state")
 	if pending == failed {
 		t.Errorf("pending and failed must not look alike: %q", pending)
 	}
-	if got := cell(volumeAttachmentRow(&compute.ListInstanceVolumesAttachment{VolumeID: "v-2"}), "mount_state"); got != "not managed" {
+	if got := cell(volumeAttachmentRow(&compute.AttachedVolume{ID: "v-2"}), "mount_state"); got != "not managed" {
 		t.Errorf("a bare block device is not managed; got %q", got)
 	}
 }

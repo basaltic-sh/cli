@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	basaltic "github.com/basaltic-sh/sdk-go"
 	"github.com/basaltic-sh/sdk-go/billing"
 
 	"github.com/basaltic-sh/cli/internal/cli"
@@ -104,25 +105,33 @@ func newBillingFiscalInvoiceCommand(state *cli.State) *cobra.Command {
 // newBillingFiscalInvoiceListCommand builds `basaltic billing fiscal-invoice list`.
 func newBillingFiscalInvoiceListCommand(state *cli.State) *cobra.Command {
 	var params billing.ListFiscalInvoicesParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List fiscal invoice issuance and delivery status",
+		Short: "List issued fiscal invoices",
 		Args:  cobra.ExactArgs(0),
+		Long:  "List issued fiscal invoices.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := billingClient(state, "/v1/fiscal-invoices")
 			if err != nil {
 				return err
 			}
-			out, err := c.ListFiscalInvoices(cmd.Context(), &params)
+			if fetchAll {
+				return state.Printer().Iter(c.ListFiscalInvoicesAll(cmd.Context(), &params))
+			}
+			page, err := c.ListFiscalInvoices(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.Invoice, "invoice", "", "Canonical billing invoice CRN")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
@@ -444,7 +453,9 @@ func newBillingProfileUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("tax-id-kind") {
 				body.TaxIDKind = &taxIdKindFlag
 			}
-			out, err := c.UpdateBillingProfile(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateBillingProfile(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}

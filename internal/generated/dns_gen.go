@@ -154,6 +154,7 @@ func newDnsRecordCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -204,7 +205,9 @@ func newDnsRecordUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--values: %w", err)
 				}
 			}
-			out, err := c.UpdateRecord(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateRecord(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -373,6 +376,7 @@ func newDnsZoneCreateCommand(state *cli.State) *cobra.Command {
 				body.Visibility = &visibilityFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -426,7 +430,9 @@ func newDnsZoneUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateZone(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateZone(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -485,6 +491,7 @@ func newDnsZoneAssociateVpcAssociationCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -616,6 +623,7 @@ func newDnsZoneImportCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}

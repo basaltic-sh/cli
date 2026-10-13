@@ -272,6 +272,7 @@ func newComputeImageCreateCommand(state *cli.State) *cobra.Command {
 				body.Version = &versionFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -348,7 +349,9 @@ func newComputeImageUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateImage(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateImage(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -447,14 +450,14 @@ func newComputeInstanceCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newComputeInstanceCreateCommand(state))
 	cmd.AddCommand(newComputeInstanceUpdateCommand(state))
 	cmd.AddCommand(newComputeInstanceDeleteCommand(state))
-	cmd.AddCommand(newComputeInstanceAttachNicCommand(state))
+	cmd.AddCommand(newComputeInstanceAttachInterfaceCommand(state))
 	cmd.AddCommand(newComputeInstanceAttachVolumeCommand(state))
 	cmd.AddCommand(newComputeInstanceConsoleOutputCommand(state))
 	cmd.AddCommand(newComputeInstanceConsoleScreenshotCommand(state))
 	cmd.AddCommand(newComputeInstanceConsoleTicketCommand(state))
-	cmd.AddCommand(newComputeInstanceDetachNicCommand(state))
+	cmd.AddCommand(newComputeInstanceDetachInterfaceCommand(state))
 	cmd.AddCommand(newComputeInstanceDetachVolumeCommand(state))
-	cmd.AddCommand(newComputeInstanceListNicsCommand(state))
+	cmd.AddCommand(newComputeInstanceListInterfacesCommand(state))
 	cmd.AddCommand(newComputeInstanceListVolumesCommand(state))
 	cmd.AddCommand(newComputeInstanceRebootCommand(state))
 	cmd.AddCommand(newComputeInstanceReinstallCommand(state))
@@ -608,6 +611,7 @@ func newComputeInstanceCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -677,7 +681,9 @@ func newComputeInstanceUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateInstance(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateInstance(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -717,13 +723,13 @@ func newComputeInstanceDeleteCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newComputeInstanceAttachNicCommand builds `basaltic compute instance attach-nic`.
-func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
-	var body compute.AttachInstanceNICRequest
+// newComputeInstanceAttachInterfaceCommand builds `basaltic compute instance attach-interface`.
+func newComputeInstanceAttachInterfaceCommand(state *cli.State) *cobra.Command {
+	var body compute.AttachInstanceInterfaceRequest
 	var bodyFile string
 	var idempotencyKey string
 	cmd := &cobra.Command{
-		Use:   "attach-nic <instance-id>",
+		Use:   "attach-interface <instance-id>",
 		Short: "Attach an existing NIC to an instance",
 		Args:  cobra.ExactArgs(1),
 		Long:  "Attach an existing NIC to an instance.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
@@ -733,15 +739,16 @@ func newComputeInstanceAttachNicCommand(state *cli.State) *cobra.Command {
 			}, []string{"interface"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/instances/{instance_id}/nics")
+			c, err := computeClient(state, "/v1/instances/{instance_id}/interfaces")
 			if err != nil {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
-			out, err := c.AttachInstanceNIC(cmd.Context(), args[0], &body, reqOpts...)
+			out, err := c.AttachInstanceInterface(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -792,6 +799,7 @@ func newComputeInstanceAttachVolumeCommand(state *cli.State) *cobra.Command {
 				body.MountPath = &mountPathFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -884,21 +892,21 @@ func newComputeInstanceConsoleTicketCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newComputeInstanceDetachNicCommand builds `basaltic compute instance detach-nic`.
-func newComputeInstanceDetachNicCommand(state *cli.State) *cobra.Command {
+// newComputeInstanceDetachInterfaceCommand builds `basaltic compute instance detach-interface`.
+func newComputeInstanceDetachInterfaceCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "detach-nic <instance-id> <interface-id>",
-		Short: "Detach a NIC from a running instance",
+		Use:   "detach-interface <instance-id> <interface-id>",
+		Short: "Detach an interface from a running instance",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/instances/{instance_id}/nics/{interface_id}")
+			c, err := computeClient(state, "/v1/instances/{instance_id}/interfaces/{interface_id}")
 			if err != nil {
 				return err
 			}
-			if err := c.DetachInstanceNIC(cmd.Context(), args[0], args[1]); err != nil {
+			if err := c.DetachInstanceInterface(cmd.Context(), args[0], args[1]); err != nil {
 				return err
 			}
-			state.Printer().Done("Detach nic requested.")
+			state.Printer().Done("Detach interface requested.")
 			return nil
 		},
 	}
@@ -930,23 +938,23 @@ func newComputeInstanceDetachVolumeCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newComputeInstanceListNicsCommand builds `basaltic compute instance list-nics`.
-func newComputeInstanceListNicsCommand(state *cli.State) *cobra.Command {
-	var params compute.ListInstanceNiCsParams
+// newComputeInstanceListInterfacesCommand builds `basaltic compute instance list-interfaces`.
+func newComputeInstanceListInterfacesCommand(state *cli.State) *cobra.Command {
+	var params compute.ListInstanceInterfacesParams
 	cmd := &cobra.Command{
-		Use:   "list-nics <instance-id>",
+		Use:   "list-interfaces <instance-id>",
 		Short: "List the instance's network interfaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := computeClient(state, "/v1/instances/{instance_id}/nics")
+			c, err := computeClient(state, "/v1/instances/{instance_id}/interfaces")
 			if err != nil {
 				return err
 			}
-			out, err := c.ListInstanceNiCs(cmd.Context(), args[0], &params)
+			page, err := c.ListInstanceInterfaces(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
@@ -968,11 +976,11 @@ func newComputeInstanceListVolumesCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.ListInstanceVolumes(cmd.Context(), args[0], &params)
+			page, err := c.ListInstanceVolumes(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
@@ -1007,6 +1015,7 @@ func newComputeInstanceRebootCommand(state *cli.State) *cobra.Command {
 				body.Hard = &hardFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1060,6 +1069,7 @@ func newComputeInstanceReinstallCommand(state *cli.State) *cobra.Command {
 				body.VolumeType = &volumeTypeFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1101,6 +1111,7 @@ func newComputeInstanceResizeCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1197,7 +1208,9 @@ func newComputeInstanceUpdateVolumeCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.UpdateInstanceVolumeAttachment(cmd.Context(), args[0], args[1], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.UpdateInstanceVolumeAttachment(cmd.Context(), args[0], args[1], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Update volume requested.")
@@ -1315,9 +1328,10 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 				"max_count":     "max-count",
 				"min_count":     "min-count",
 				"name":          "name",
+				"subnets":       "subnets",
 				"tags":          "tags",
 				"template":      "template",
-			}, []string{"name", "template"})
+			}, []string{"name", "subnets", "template"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := computeClient(state, "/v1/instance-pools")
@@ -1352,6 +1366,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1371,6 +1386,7 @@ func newComputeInstancePoolCreateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&maxCountFlag, "max-count", 0, "A value of 0 means the pool holds no members until max_count is raised")
 	f.IntVar(&minCountFlag, "min-count", 0, "Min count")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
+	f.StringSliceVar(&body.Subnets, "subnets", nil, "Subnet UUIDs or CRNs in the same VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Labels on the pool resource, for IAM conditions (basalt:RequestTag/<key> here, basalt:ResourceTag/<key> on later operations) and cost attribution (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Template (JSON)")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
@@ -1399,6 +1415,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 				"desired_count": "desired-count",
 				"max_count":     "max-count",
 				"min_count":     "min-count",
+				"subnets":       "subnets",
 				"tags":          "tags",
 				"template":      "template",
 			}, []string{})
@@ -1435,7 +1452,9 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--template: %w", err)
 				}
 			}
-			out, err := c.UpdateInstancePool(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateInstancePool(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1450,6 +1469,7 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the resulting min_count/max_count and the hard platform cap of 100")
 	f.IntVar(&maxCountFlag, "max-count", 0, "New upper bound; omitted desired_count falls to this bound if needed")
 	f.IntVar(&minCountFlag, "min-count", 0, "New lower bound; omitted desired_count rises to this bound if needed")
+	f.StringSliceVar(&body.Subnets, "subnets", nil, "Replace the eligible placement set")
 	f.StringVar(&tagsFlag, "tags", "", "REPLACES the pool's labels: the map you send becomes the whole set, an empty object clears them, and omitting the field leaves them alone (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Replaces the launch config WHOLESALE — the object you send is what the pool launches next, and anything you leave out is cleared rather than kept (JSON)")
 	return cmd
@@ -1499,6 +1519,7 @@ func newComputeInstancePoolAttachFloatingIpCommand(state *cli.State) *cobra.Comm
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}

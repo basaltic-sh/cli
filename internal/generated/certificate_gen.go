@@ -159,6 +159,7 @@ func newCertificateCertificateCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}

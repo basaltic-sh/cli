@@ -33,6 +33,7 @@ func newNetworkCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkInterfaceCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayCommand(state))
 	cmd.AddCommand(newNetworkNatGatewayCommand(state))
+	cmd.AddCommand(newNetworkPrefixPoolCommand(state))
 	cmd.AddCommand(newNetworkRouteCommand(state))
 	cmd.AddCommand(newNetworkRouteTableCommand(state))
 	cmd.AddCommand(newNetworkSecurityGroupCommand(state))
@@ -160,6 +161,7 @@ func newNetworkEgressOnlyGatewayCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -210,7 +212,9 @@ func newNetworkEgressOnlyGatewayUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateEgressOnlyGateway(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateEgressOnlyGateway(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -294,8 +298,10 @@ func newNetworkFloatingIpCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkFloatingIpCreateCommand(state))
 	cmd.AddCommand(newNetworkFloatingIpUpdateCommand(state))
 	cmd.AddCommand(newNetworkFloatingIpDeleteCommand(state))
-	cmd.AddCommand(newNetworkFloatingIpAttachCommand(state))
-	cmd.AddCommand(newNetworkFloatingIpDetachCommand(state))
+	cmd.AddCommand(newNetworkFloatingIpAttachInterfaceCommand(state))
+	cmd.AddCommand(newNetworkFloatingIpDetachAllInterfacesCommand(state))
+	cmd.AddCommand(newNetworkFloatingIpDetachInterfaceCommand(state))
+	cmd.AddCommand(newNetworkFloatingIpListInterfacesCommand(state))
 	return cmd
 }
 
@@ -325,7 +331,7 @@ func newNetworkFloatingIpListCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&params.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface for an ordinary binding, an instance pool (including a pool with zero members), or a load balancer")
+	f.StringVar(&params.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface in the interfaces collection, an instance pool (including an empty pool), or a load balancer")
 	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
@@ -356,7 +362,7 @@ func newNetworkFloatingIpGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&scope.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface for an ordinary binding, an instance pool (including a pool with zero members), or a load balancer")
+	f.StringVar(&scope.AttachedTo, "attached-to", "", "Exact attachment CRN: an interface in the interfaces collection, an instance pool (including an empty pool), or a load balancer")
 	return cmd
 }
 
@@ -414,6 +420,7 @@ func newNetworkFloatingIpCreateCommand(state *cli.State) *cobra.Command {
 				body.Visibility = &visibilityFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -473,7 +480,9 @@ func newNetworkFloatingIpUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateFloatingIP(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateFloatingIP(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -512,16 +521,16 @@ func newNetworkFloatingIpDeleteCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newNetworkFloatingIpAttachCommand builds `basaltic network floating-ip attach`.
-func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
+// newNetworkFloatingIpAttachInterfaceCommand builds `basaltic network floating-ip attach-interface`.
+func newNetworkFloatingIpAttachInterfaceCommand(state *cli.State) *cobra.Command {
 	var body network.AttachFloatingIPRequest
 	var bodyFile string
 	var idempotencyKey string
 	cmd := &cobra.Command{
-		Use:   "attach <floating-ip-id>",
-		Short: "Attach a floating IP to an interface",
+		Use:   "attach-interface <floating-ip-id>",
+		Short: "Attach an interface to a floating IP",
 		Args:  cobra.ExactArgs(1),
-		Long:  "Attach a floating IP to an interface.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		Long:  "Attach an interface to a floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
 				"address_id": "address-id",
@@ -529,11 +538,12 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 			}, []string{"address_id", "interface"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/attach")
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/interfaces")
 			if err != nil {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -553,46 +563,83 @@ func newNetworkFloatingIpAttachCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newNetworkFloatingIpDetachCommand builds `basaltic network floating-ip detach`.
-func newNetworkFloatingIpDetachCommand(state *cli.State) *cobra.Command {
-	var body network.DetachFloatingIPRequest
-	var bodyFile string
-	var interfaceFlag string
-	var idempotencyKey string
+// newNetworkFloatingIpDetachAllInterfacesCommand builds `basaltic network floating-ip detach-all-interfaces`.
+func newNetworkFloatingIpDetachAllInterfacesCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "detach <floating-ip-id>",
-		Short: "Detach a floating IP",
+		Use:   "detach-all-interfaces <floating-ip-id>",
+		Short: "Detach all direct interfaces from a floating IP",
 		Args:  cobra.ExactArgs(1),
-		Long:  "Detach a floating IP.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"interface": "interface",
-			}, []string{})
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/detach")
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/interfaces")
 			if err != nil {
 				return err
 			}
-			if cmd.Flags().Changed("interface") {
-				body.Interface = &interfaceFlag
-			}
-			var reqOpts []basaltic.RequestOption
-			if idempotencyKey != "" {
-				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
-			}
-			out, err := c.DetachFloatingIP(cmd.Context(), args[0], &body, reqOpts...)
-			if err != nil {
+			if err := c.DetachFloatingIP(cmd.Context(), args[0]); err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			state.Printer().Done("Detach all interfaces requested.")
+			return nil
 		},
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&interfaceFlag, "interface", "", "Interface UUID or nested CRN; bare names, null and empty references are rejected")
-	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
+	return cmd
+}
+
+// newNetworkFloatingIpDetachInterfaceCommand builds `basaltic network floating-ip detach-interface`.
+func newNetworkFloatingIpDetachInterfaceCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "detach-interface <floating-ip-id> <interface-id>",
+		Short: "Detach an interface from a floating IP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/interfaces/{interface_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DetachFloatingIPInterface(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			state.Printer().Done("Detach interface requested.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newNetworkFloatingIpListInterfacesCommand builds `basaltic network floating-ip list-interfaces`.
+func newNetworkFloatingIpListInterfacesCommand(state *cli.State) *cobra.Command {
+	var params network.ListFloatingIPInterfacesParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list-interfaces <floating-ip-id>",
+		Short: "List a floating IP’s interfaces",
+		Args:  cobra.ExactArgs(1),
+		Long:  "List a floating IP’s interfaces.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/floating-ips/{floating_ip_id}/interfaces")
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListFloatingIPInterfacesAll(cmd.Context(), args[0], &params))
+			}
+			page, err := c.ListFloatingIPInterfaces(cmd.Context(), args[0], &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact interface CRN")
+	f.IntVar(&params.Limit, "limit", 0, "Limit")
+	f.StringVar(&params.Marker, "marker", "", "Marker")
+	f.StringVar(&params.Name, "name", "", "Interface names require subnet scope; this collection rejects bare name filters")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
@@ -608,15 +655,16 @@ func newNetworkInterfaceCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkInterfaceCreateCommand(state))
 	cmd.AddCommand(newNetworkInterfaceUpdateCommand(state))
 	cmd.AddCommand(newNetworkInterfaceDeleteCommand(state))
+	cmd.AddCommand(newNetworkInterfaceAttachSecurityGroupCommand(state))
 	cmd.AddCommand(newNetworkInterfaceCreateAddressCommand(state))
 	cmd.AddCommand(newNetworkInterfaceCreatePrefixCommand(state))
 	cmd.AddCommand(newNetworkInterfaceDeleteAddressCommand(state))
 	cmd.AddCommand(newNetworkInterfaceDeletePrefixCommand(state))
+	cmd.AddCommand(newNetworkInterfaceDetachSecurityGroupCommand(state))
 	cmd.AddCommand(newNetworkInterfaceGetAddressCommand(state))
 	cmd.AddCommand(newNetworkInterfaceListAddressesCommand(state))
 	cmd.AddCommand(newNetworkInterfaceListPrefixesCommand(state))
 	cmd.AddCommand(newNetworkInterfaceListSecurityGroupsCommand(state))
-	cmd.AddCommand(newNetworkInterfaceSetSecurityGroupCommand(state))
 	return cmd
 }
 
@@ -729,6 +777,7 @@ func newNetworkInterfaceCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -781,7 +830,9 @@ func newNetworkInterfaceUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateInterface(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateInterface(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -819,6 +870,40 @@ func newNetworkInterfaceDeleteCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newNetworkInterfaceAttachSecurityGroupCommand builds `basaltic network interface attach-security-group`.
+func newNetworkInterfaceAttachSecurityGroupCommand(state *cli.State) *cobra.Command {
+	var body network.InterfaceSecurityGroupRequest
+	var bodyFile string
+	cmd := &cobra.Command{
+		Use:   "attach-security-group <interface-id>",
+		Short: "Attach a security group to an interface",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"security_group": "security-group",
+			}, []string{"security_group"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
+			if err != nil {
+				return err
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.AttachInterfaceSecurityGroup(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.SecurityGroup, "security-group", "", "Security group UUID, CRN, or account-scoped name")
+	return cmd
+}
+
 // newNetworkInterfaceCreateAddressCommand builds `basaltic network interface create-address`.
 func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 	var body network.AddressRequest
@@ -842,7 +927,9 @@ func newNetworkInterfaceCreateAddressCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("address") {
 				body.Address = &addressFlag
 			}
-			out, err := c.CreateInterfaceAddress(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreateInterfaceAddress(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -867,15 +954,17 @@ func newNetworkInterfaceCreatePrefixCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"pool_id": "pool-id",
-			}, []string{"pool_id"})
+				"pool": "pool",
+			}, []string{"pool"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}/prefixes")
 			if err != nil {
 				return err
 			}
-			out, err := c.CreateInterfacePrefix(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreateInterfacePrefix(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -885,7 +974,7 @@ func newNetworkInterfaceCreatePrefixCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.PoolID, "pool-id", "", "Pool id")
+	f.StringVar(&body.Pool, "pool", "", "Pool UUID or CRN in the interface VPC")
 	return cmd
 }
 
@@ -927,6 +1016,29 @@ func newNetworkInterfaceDeletePrefixCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			state.Printer().Done("Delete prefix requested.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newNetworkInterfaceDetachSecurityGroupCommand builds `basaltic network interface detach-security-group`.
+func newNetworkInterfaceDetachSecurityGroupCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "detach-security-group <interface-id> <security-group-id>",
+		Short: "Detach a security group from an interface",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups/{security_group_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DetachInterfaceSecurityGroup(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			state.Printer().Done("Detach security group requested.")
 			return nil
 		},
 	}
@@ -1007,14 +1119,19 @@ func newNetworkInterfaceListPrefixesCommand(state *cli.State) *cobra.Command {
 // newNetworkInterfaceListSecurityGroupsCommand builds `basaltic network interface list-security-groups`.
 func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Command {
 	var params network.ListInterfaceSecurityGroupsParams
+	var fetchAll bool
 	cmd := &cobra.Command{
 		Use:   "list-security-groups <interface-id>",
-		Short: "List interface security-group membership",
+		Short: "List an interface’s security groups",
 		Args:  cobra.ExactArgs(1),
+		Long:  "List an interface’s security groups.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
 			if err != nil {
 				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListInterfaceSecurityGroupsAll(cmd.Context(), args[0], &params))
 			}
 			page, err := c.ListInterfaceSecurityGroups(cmd.Context(), args[0], &params)
 			if err != nil {
@@ -1026,39 +1143,10 @@ func newNetworkInterfaceListSecurityGroupsCommand(state *cli.State) *cobra.Comma
 	f := cmd.Flags()
 	_ = f
 	f.StringVar(&params.CRN, "crn", "", "Exact CRN, validated against the endpoint type, region and caller account")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Exact resource name")
-	return cmd
-}
-
-// newNetworkInterfaceSetSecurityGroupCommand builds `basaltic network interface set-security-group`.
-func newNetworkInterfaceSetSecurityGroupCommand(state *cli.State) *cobra.Command {
-	var body network.InterfaceSecurityGroupsRequest
-	var bodyFile string
-	cmd := &cobra.Command{
-		Use:   "set-security-group <interface-id>",
-		Short: "Set interface security-group membership",
-		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"security_groups": "security-groups",
-			}, []string{"security_groups"})
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/interfaces/{interface_id}/security-groups")
-			if err != nil {
-				return err
-			}
-			page, err := c.SetInterfaceSecurityGroups(cmd.Context(), args[0], &body)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Page(page)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringSliceVar(&body.SecurityGroups, "security-groups", nil, "Security-group UUIDs, CRNs or account-scoped names")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
 
@@ -1074,8 +1162,6 @@ func newNetworkInternetGatewayCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkInternetGatewayCreateCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayUpdateCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayDeleteCommand(state))
-	cmd.AddCommand(newNetworkInternetGatewayAttachCommand(state))
-	cmd.AddCommand(newNetworkInternetGatewayDetachCommand(state))
 	cmd.AddCommand(newNetworkInternetGatewayListRoutesCommand(state))
 	return cmd
 }
@@ -1156,7 +1242,8 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 				"description": "description",
 				"name":        "name",
 				"tags":        "tags",
-			}, []string{"name"})
+				"vpc":         "vpc",
+			}, []string{"name", "vpc"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/internet-gateways")
@@ -1172,6 +1259,7 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1188,6 +1276,7 @@ func newNetworkInternetGatewayCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&body.Name, "name", "", "Resource names must not start with the literal crn: prefix or be UUIDs (canonical, compact, braced, or urn:uuid: forms, in either case)")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
+	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1221,7 +1310,9 @@ func newNetworkInternetGatewayUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateInternetGateway(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateInternetGateway(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1256,75 +1347,6 @@ func newNetworkInternetGatewayDeleteCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	return cmd
-}
-
-// newNetworkInternetGatewayAttachCommand builds `basaltic network internet-gateway attach`.
-func newNetworkInternetGatewayAttachCommand(state *cli.State) *cobra.Command {
-	var body network.InternetGatewayAttachRequest
-	var bodyFile string
-	var idempotencyKey string
-	cmd := &cobra.Command{
-		Use:   "attach <internet-gateway-id>",
-		Short: "Attach internet gateway to a VPC",
-		Args:  cobra.ExactArgs(1),
-		Long:  "Attach internet gateway to a VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"vpc": "vpc",
-			}, []string{"vpc"})
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/attach")
-			if err != nil {
-				return err
-			}
-			var reqOpts []basaltic.RequestOption
-			if idempotencyKey != "" {
-				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
-			}
-			out, err := c.AttachInternetGateway(cmd.Context(), args[0], &body, reqOpts...)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.VPC, "vpc", "", "VPC UUID, CRN or exact name in the caller account")
-	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
-	return cmd
-}
-
-// newNetworkInternetGatewayDetachCommand builds `basaltic network internet-gateway detach`.
-func newNetworkInternetGatewayDetachCommand(state *cli.State) *cobra.Command {
-	var idempotencyKey string
-	cmd := &cobra.Command{
-		Use:   "detach <internet-gateway-id>",
-		Short: "Detach internet gateway from its VPC",
-		Args:  cobra.ExactArgs(1),
-		Long:  "Detach internet gateway from its VPC.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/internet-gateways/{internet_gateway_id}/detach")
-			if err != nil {
-				return err
-			}
-			var reqOpts []basaltic.RequestOption
-			if idempotencyKey != "" {
-				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
-			}
-			out, err := c.DetachInternetGateway(cmd.Context(), args[0], reqOpts...)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
 
@@ -1475,6 +1497,7 @@ func newNetworkNatGatewayCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1525,7 +1548,9 @@ func newNetworkNatGatewayUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateNATGateway(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateNATGateway(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1594,6 +1619,99 @@ func newNetworkNatGatewayListRoutesCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last id from the previous page")
 	f.StringVar(&params.Name, "name", "", "Exact resource name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
+// newNetworkPrefixPoolCommand builds `basaltic network prefix-pool`.
+func newNetworkPrefixPoolCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "prefix-pool",
+		Short:   "Prefix pools",
+		Aliases: []string{"prefix-pools"},
+	}
+	cmd.AddCommand(newNetworkPrefixPoolListCommand(state))
+	cmd.AddCommand(newNetworkPrefixPoolCreateCommand(state))
+	cmd.AddCommand(newNetworkPrefixPoolDeleteCommand(state))
+	return cmd
+}
+
+// newNetworkPrefixPoolListCommand builds `basaltic network prefix-pool list`.
+func newNetworkPrefixPoolListCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list <vpc-id>",
+		Short: "List prefix pools",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
+			if err != nil {
+				return err
+			}
+			out, err := c.ListPrefixPools(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newNetworkPrefixPoolCreateCommand builds `basaltic network prefix-pool create`.
+func newNetworkPrefixPoolCreateCommand(state *cli.State) *cobra.Command {
+	var body network.CreatePrefixPoolRequest
+	var bodyFile string
+	cmd := &cobra.Command{
+		Use:   "create <vpc-id>",
+		Short: "Create prefix pool",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"cidr_ipv4": "cidr-ipv4",
+			}, []string{"cidr_ipv4"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
+			if err != nil {
+				return err
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreatePrefixPool(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&body.CIDRIPv4, "cidr-ipv4", "", "Cidr ipv4")
+	return cmd
+}
+
+// newNetworkPrefixPoolDeleteCommand builds `basaltic network prefix-pool delete`.
+func newNetworkPrefixPoolDeleteCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <vpc-id> <pool-id>",
+		Short: "Delete prefix pool",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools/{pool_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DeletePrefixPool(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			state.Printer().Done("Deleted.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
@@ -1724,6 +1842,7 @@ func newNetworkRouteCreateCommand(state *cli.State) *cobra.Command {
 				body.TargetNATGateway = &targetNatGatewayFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1777,7 +1896,9 @@ func newNetworkRouteUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateRoute(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateRoute(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1925,6 +2046,7 @@ func newNetworkRouteTableCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1975,7 +2097,9 @@ func newNetworkRouteTableUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateRouteTable(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateRouteTable(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2120,6 +2244,7 @@ func newNetworkSecurityGroupCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -2169,7 +2294,9 @@ func newNetworkSecurityGroupUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateSecurityGroup(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateSecurityGroup(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2332,6 +2459,7 @@ func newNetworkSecurityGroupRuleCreateCommand(state *cli.State) *cobra.Command {
 				body.SourceSecurityGroup = &sourceSecurityGroupFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -2392,6 +2520,7 @@ func newNetworkSubnetCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkSubnetCreateCommand(state))
 	cmd.AddCommand(newNetworkSubnetUpdateCommand(state))
 	cmd.AddCommand(newNetworkSubnetDeleteCommand(state))
+	cmd.AddCommand(newNetworkSubnetEnableIpv6Command(state))
 	return cmd
 }
 
@@ -2511,6 +2640,7 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -2541,11 +2671,7 @@ func newNetworkSubnetCreateCommand(state *cli.State) *cobra.Command {
 func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	var body network.SubnetUpdateRequest
 	var bodyFile string
-	var allocateCidriPv6Flag bool
-	var cidriPv6Flag string
-	var copyIPv4securityRulesFlag bool
 	var descriptionFlag string
-	var iPv6routingFlag string
 	var routeTableFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -2554,13 +2680,9 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"allocate_cidr_ipv6":       "allocate-cidr-ipv6",
-				"cidr_ipv6":                "cidr-ipv6",
-				"copy_ipv4_security_rules": "copy-ipv4-security-rules",
-				"description":              "description",
-				"ipv6_routing":             "ipv6-routing",
-				"route_table":              "route-table",
-				"tags":                     "tags",
+				"description": "description",
+				"route_table": "route-table",
+				"tags":        "tags",
 			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -2568,20 +2690,8 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if cmd.Flags().Changed("allocate-cidr-ipv6") {
-				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
-			}
-			if cmd.Flags().Changed("cidr-ipv6") {
-				body.CIDRIPv6 = &cidriPv6Flag
-			}
-			if cmd.Flags().Changed("copy-ipv4-security-rules") {
-				body.CopyIPv4SecurityRules = &copyIPv4securityRulesFlag
-			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
-			}
-			if cmd.Flags().Changed("ipv6-routing") {
-				body.IPv6Routing = &iPv6routingFlag
 			}
 			if cmd.Flags().Changed("route-table") {
 				body.RouteTable = &routeTableFlag
@@ -2591,7 +2701,9 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateSubnet(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateSubnet(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2601,11 +2713,7 @@ func newNetworkSubnetUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a free /64 from the VPC IPv6 range")
-	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "An aligned /64 inside the VPC IPv6 range")
-	f.BoolVar(&copyIPv4securityRulesFlag, "copy-ipv4-security-rules", false, "When enabling IPv6, copy equivalent rules in security groups used by this subnet's interfaces")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
-	f.StringVar(&iPv6routingFlag, "ipv6-routing", "", "When enabling IPv6, optionally add ::/0 to the subnet's route table (one of: match_ipv4, unchanged, internet_gateway, nat_gateway, egress_only_gateway)")
 	f.StringVar(&routeTableFlag, "route-table", "", "Route-table UUID, nested CRN or exact name within the subnet VPC")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -2634,6 +2742,62 @@ func newNetworkSubnetDeleteCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
+// newNetworkSubnetEnableIpv6Command builds `basaltic network subnet enable-ipv6`.
+func newNetworkSubnetEnableIpv6Command(state *cli.State) *cobra.Command {
+	var body network.SubnetIPv6request
+	var bodyFile string
+	var allocateCidriPv6Flag bool
+	var cidriPv6Flag string
+	var copyIPv4securityRulesFlag bool
+	var iPv6routingFlag string
+	cmd := &cobra.Command{
+		Use:   "enable-ipv6 <subnet-id>",
+		Short: "Enable IPv6 on a subnet",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"allocate_cidr_ipv6":       "allocate-cidr-ipv6",
+				"cidr_ipv6":                "cidr-ipv6",
+				"copy_ipv4_security_rules": "copy-ipv4-security-rules",
+				"ipv6_routing":             "ipv6-routing",
+			}, []string{})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := networkClient(state, "/v1/subnets/{subnet_id}/ipv6")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("allocate-cidr-ipv6") {
+				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
+			}
+			if cmd.Flags().Changed("cidr-ipv6") {
+				body.CIDRIPv6 = &cidriPv6Flag
+			}
+			if cmd.Flags().Changed("copy-ipv4-security-rules") {
+				body.CopyIPv4SecurityRules = &copyIPv4securityRulesFlag
+			}
+			if cmd.Flags().Changed("ipv6-routing") {
+				body.IPv6Routing = &iPv6routingFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.EnableSubnetIPv6(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a free /64 from the VPC IPv6 range")
+	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "An aligned /64 inside the VPC IPv6 range")
+	f.BoolVar(&copyIPv4securityRulesFlag, "copy-ipv4-security-rules", false, "When enabling IPv6, copy equivalent rules in security groups used by this subnet's interfaces")
+	f.StringVar(&iPv6routingFlag, "ipv6-routing", "", "When enabling IPv6, optionally add ::/0 to the subnet's route table (one of: match_ipv4, unchanged, internet_gateway, nat_gateway, egress_only_gateway)")
+	return cmd
+}
+
 // newNetworkVpcCommand builds `basaltic network vpc`.
 func newNetworkVpcCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -2646,9 +2810,7 @@ func newNetworkVpcCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newNetworkVpcCreateCommand(state))
 	cmd.AddCommand(newNetworkVpcUpdateCommand(state))
 	cmd.AddCommand(newNetworkVpcDeleteCommand(state))
-	cmd.AddCommand(newNetworkVpcCreatePrefixPoolCommand(state))
-	cmd.AddCommand(newNetworkVpcDeletePrefixPoolCommand(state))
-	cmd.AddCommand(newNetworkVpcListPrefixPoolsCommand(state))
+	cmd.AddCommand(newNetworkVpcEnableIpv6Command(state))
 	return cmd
 }
 
@@ -2755,6 +2917,7 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -2782,8 +2945,6 @@ func newNetworkVpcCreateCommand(state *cli.State) *cobra.Command {
 func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 	var body network.VPCUpdateRequest
 	var bodyFile string
-	var allocateCidriPv6Flag bool
-	var cidriPv6Flag string
 	var descriptionFlag string
 	var tagsFlag string
 	cmd := &cobra.Command{
@@ -2792,22 +2953,14 @@ func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"allocate_cidr_ipv6": "allocate-cidr-ipv6",
-				"cidr_ipv6":          "cidr-ipv6",
-				"description":        "description",
-				"tags":               "tags",
+				"description": "description",
+				"tags":        "tags",
 			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := networkClient(state, "/v1/vpcs/{vpc_id}")
 			if err != nil {
 				return err
-			}
-			if cmd.Flags().Changed("allocate-cidr-ipv6") {
-				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
-			}
-			if cmd.Flags().Changed("cidr-ipv6") {
-				body.CIDRIPv6 = &cidriPv6Flag
 			}
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
@@ -2817,7 +2970,9 @@ func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateVPC(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateVPC(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2827,8 +2982,6 @@ func newNetworkVpcUpdateCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a regional GUA /60")
-	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "Optional aligned locally assigned ULA (fd00::/8), /48 through /60")
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
 	return cmd
@@ -2857,25 +3010,36 @@ func newNetworkVpcDeleteCommand(state *cli.State) *cobra.Command {
 	return cmd
 }
 
-// newNetworkVpcCreatePrefixPoolCommand builds `basaltic network vpc create-prefix-pool`.
-func newNetworkVpcCreatePrefixPoolCommand(state *cli.State) *cobra.Command {
-	var body network.CreatePrefixPoolRequest
+// newNetworkVpcEnableIpv6Command builds `basaltic network vpc enable-ipv6`.
+func newNetworkVpcEnableIpv6Command(state *cli.State) *cobra.Command {
+	var body network.VPCIPv6request
 	var bodyFile string
+	var allocateCidriPv6Flag bool
+	var cidriPv6Flag string
 	cmd := &cobra.Command{
-		Use:   "create-prefix-pool <vpc-id>",
-		Short: "Create prefix pool",
+		Use:   "enable-ipv6 <vpc-id>",
+		Short: "Enable IPv6 on a vpc",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"cidr_ipv4": "cidr-ipv4",
-			}, []string{"cidr_ipv4"})
+				"allocate_cidr_ipv6": "allocate-cidr-ipv6",
+				"cidr_ipv6":          "cidr-ipv6",
+			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
+			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/ipv6")
 			if err != nil {
 				return err
 			}
-			out, err := c.CreatePrefixPool(cmd.Context(), args[0], &body)
+			if cmd.Flags().Changed("allocate-cidr-ipv6") {
+				body.AllocateCIDRIPv6 = &allocateCidriPv6Flag
+			}
+			if cmd.Flags().Changed("cidr-ipv6") {
+				body.CIDRIPv6 = &cidriPv6Flag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.EnableVpciPv6(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2885,52 +3049,7 @@ func newNetworkVpcCreatePrefixPoolCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.CIDRIPv4, "cidr-ipv4", "", "Cidr ipv4")
-	return cmd
-}
-
-// newNetworkVpcDeletePrefixPoolCommand builds `basaltic network vpc delete-prefix-pool`.
-func newNetworkVpcDeletePrefixPoolCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete-prefix-pool <vpc-id> <pool-id>",
-		Short: "Delete prefix pool",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools/{pool_id}")
-			if err != nil {
-				return err
-			}
-			if err := c.DeletePrefixPool(cmd.Context(), args[0], args[1]); err != nil {
-				return err
-			}
-			state.Printer().Done("Delete prefix pool requested.")
-			return nil
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	return cmd
-}
-
-// newNetworkVpcListPrefixPoolsCommand builds `basaltic network vpc list-prefix-pools`.
-func newNetworkVpcListPrefixPoolsCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "list-prefix-pools <vpc-id>",
-		Short: "List prefix pools",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := networkClient(state, "/v1/vpcs/{vpc_id}/prefix-pools")
-			if err != nil {
-				return err
-			}
-			out, err := c.ListPrefixPools(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
+	f.BoolVar(&allocateCidriPv6Flag, "allocate-cidr-ipv6", false, "Allocate a regional GUA /60")
+	f.StringVar(&cidriPv6Flag, "cidr-ipv6", "", "Optional aligned locally assigned ULA (fd00::/8), /48 through /60")
 	return cmd
 }

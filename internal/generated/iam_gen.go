@@ -28,8 +28,8 @@ func newIamCommand(state *cli.State) *cobra.Command {
 	}
 	cmd.AddCommand(newIamAuthCommand(state))
 	cmd.AddCommand(newIamOauthCommand(state))
+	cmd.AddCommand(newIamOidcProviderCommand(state))
 	cmd.AddCommand(newIamPolicyCommand(state))
-	cmd.AddCommand(newIamRegionCommand(state))
 	cmd.AddCommand(newIamRoleCommand(state))
 	cmd.AddCommand(newIamServiceAccountCommand(state))
 	cmd.AddCommand(newIamSshKeyCommand(state))
@@ -119,7 +119,9 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("state") {
 				body.State = &stateFlag
 			}
-			out, err := c.AuthorizeOAuthClient(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.AuthorizeOAuthClient(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -135,6 +137,203 @@ func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
 	f.StringVar((*string)(&body.Organization), "organization", "", "Organization")
 	f.StringVar(&body.RedirectURI, "redirect-uri", "", "For the CLI this must be urn:ietf:wg:oauth:2.0:oob — the out-of-band pseudo-redirect, meaning the code is DISPLAYED rather than delivered anywhere")
 	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
+	return cmd
+}
+
+// newIamOidcProviderCommand builds `basaltic iam oidc-provider`.
+func newIamOidcProviderCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "oidc-provider",
+		Short:   "Oidc providers",
+		Aliases: []string{"oidc-providers"},
+	}
+	cmd.AddCommand(newIamOidcProviderListCommand(state))
+	cmd.AddCommand(newIamOidcProviderGetCommand(state))
+	cmd.AddCommand(newIamOidcProviderCreateCommand(state))
+	cmd.AddCommand(newIamOidcProviderUpdateCommand(state))
+	cmd.AddCommand(newIamOidcProviderDeleteCommand(state))
+	return cmd
+}
+
+// newIamOidcProviderListCommand builds `basaltic iam oidc-provider list`.
+func newIamOidcProviderListCommand(state *cli.State) *cobra.Command {
+	var params iam.ListOidcProvidersParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List OIDC providers",
+		Args:  cobra.ExactArgs(0),
+		Long:  "List OIDC providers.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/oidc-providers")
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListOidcProvidersAll(cmd.Context(), &params))
+			}
+			page, err := c.ListOidcProviders(cmd.Context(), &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
+// newIamOidcProviderGetCommand builds `basaltic iam oidc-provider get`.
+func newIamOidcProviderGetCommand(state *cli.State) *cobra.Command {
+	var scope iam.ListOidcProvidersParams
+	cmd := &cobra.Command{
+		Use:   "get <ref>",
+		Short: "Get an OIDC provider",
+		Args:  cobra.ExactArgs(1),
+		Long:  "Get an OIDC provider.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/oidc-providers/{provider_id}")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetOidcProviderByReference(cmd.Context(), args[0], &scope)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newIamOidcProviderCreateCommand builds `basaltic iam oidc-provider create`.
+func newIamOidcProviderCreateCommand(state *cli.State) *cobra.Command {
+	var body iam.OidcProviderCreateRequest
+	var bodyFile string
+	var descriptionFlag string
+	var tagsFlag string
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create an OIDC provider",
+		Args:  cobra.ExactArgs(0),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"audiences":   "audiences",
+				"description": "description",
+				"issuer":      "issuer",
+				"name":        "name",
+				"tags":        "tags",
+			}, []string{"audiences", "issuer", "name"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/oidc-providers")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("description") {
+				body.Description = &descriptionFlag
+			}
+			if tagsFlag != "" {
+				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
+					return fmt.Errorf("--tags: %w", err)
+				}
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreateOidcProvider(cmd.Context(), &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringSliceVar(&body.Audiences, "audiences", nil, "Audiences")
+	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&body.Issuer, "issuer", "", "Immutable HTTPS issuer URL")
+	f.StringVar(&body.Name, "name", "", "Name")
+	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
+	return cmd
+}
+
+// newIamOidcProviderUpdateCommand builds `basaltic iam oidc-provider update`.
+func newIamOidcProviderUpdateCommand(state *cli.State) *cobra.Command {
+	var body iam.OidcProviderUpdateRequest
+	var bodyFile string
+	var descriptionFlag string
+	var tagsFlag string
+	cmd := &cobra.Command{
+		Use:   "update <provider-id>",
+		Short: "Update an OIDC provider",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"audiences":   "audiences",
+				"description": "description",
+				"tags":        "tags",
+			}, []string{})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/oidc-providers/{provider_id}")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("description") {
+				body.Description = &descriptionFlag
+			}
+			if tagsFlag != "" {
+				if err := json.Unmarshal([]byte(tagsFlag), &body.Tags); err != nil {
+					return fmt.Errorf("--tags: %w", err)
+				}
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateOidcProvider(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringSliceVar(&body.Audiences, "audiences", nil, "Audiences")
+	f.StringVar(&descriptionFlag, "description", "", "Description")
+	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
+	return cmd
+}
+
+// newIamOidcProviderDeleteCommand builds `basaltic iam oidc-provider delete`.
+func newIamOidcProviderDeleteCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <provider-id>",
+		Short: "Delete an OIDC provider",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := iamClient(state, "/v1/oidc-providers/{provider_id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteOidcProvider(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			state.Printer().Done("Deleted.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
 	return cmd
 }
 
@@ -254,6 +453,7 @@ func newIamPolicyCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -311,7 +511,9 @@ func newIamPolicyUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdatePolicy(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdatePolicy(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -415,43 +617,6 @@ func newIamPolicyListServiceAccountsCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
 	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
-	return cmd
-}
-
-// newIamRegionCommand builds `basaltic iam region`.
-func newIamRegionCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "region",
-		Short:   "Regions",
-		Aliases: []string{"regions"},
-	}
-	cmd.AddCommand(newIamRegionListCommand(state))
-	return cmd
-}
-
-// newIamRegionListCommand builds `basaltic iam region list`.
-func newIamRegionListCommand(state *cli.State) *cobra.Command {
-	var params iam.ListRegionsParams
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List regions (legacy IAM)",
-		Args:  cobra.ExactArgs(0),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state, "/v1/regions")
-			if err != nil {
-				return err
-			}
-			out, err := c.ListRegions(cmd.Context(), &params)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVar(&params.CRN, "crn", "", "Exact returned CRN, combined with name using AND before pagination")
-	f.StringVar(&params.Name, "name", "", "Exact resource name, combined with crn using AND before pagination")
 	return cmd
 }
 
@@ -581,6 +746,7 @@ func newIamRoleCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -638,7 +804,9 @@ func newIamRoleUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--trust-policy: %w", err)
 				}
 			}
-			out, err := c.UpdateRole(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateRole(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -707,7 +875,9 @@ func newIamRoleAssumeCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--policy: %w", err)
 				}
 			}
-			out, err := c.AssumeRole(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.AssumeRole(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -735,12 +905,11 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"account":            "account",
 				"duration_seconds":   "duration-seconds",
 				"role":               "role",
 				"session_name":       "session-name",
 				"web_identity_token": "web-identity-token",
-			}, []string{"account", "role", "web_identity_token"})
+			}, []string{"role", "web_identity_token"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := iamClient(state, "/v1/assume-role-with-web-identity")
@@ -753,7 +922,9 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("session-name") {
 				body.SessionName = &sessionNameFlag
 			}
-			out, err := c.AssumeRoleWithWebIdentity(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.AssumeRoleWithWebIdentity(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -763,11 +934,10 @@ func newIamRoleAssumeWithWebIdentityCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar((*string)(&body.Account), "account", "", "Account")
 	f.IntVar(&durationSecondsFlag, "duration-seconds", 0, "Credential validity duration (15 min to 12 hours)")
-	f.StringVar((*string)(&body.Role), "role", "", "Role")
+	f.StringVar(&body.Role, "role", "", "Full account-scoped role CRN")
 	f.StringVar(&sessionNameFlag, "session-name", "", "A label recorded on the session and in the audit trail")
-	f.StringVar(&body.WebIdentityToken, "web-identity-token", "", "The identity token to exchange, as a signed JWT")
+	f.StringVar(&body.WebIdentityToken, "web-identity-token", "", "Signed OIDC JWT")
 	return cmd
 }
 
@@ -792,6 +962,7 @@ func newIamRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1001,7 +1172,9 @@ func newIamRoleSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			out, err := c.PutRoleInlinePolicy(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.PutRoleInlinePolicy(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1033,7 +1206,9 @@ func newIamRoleSetPermissionBoundaryCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.SetRolePermissionBoundary(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.SetRolePermissionBoundary(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set permission boundary requested.")
@@ -1171,6 +1346,7 @@ func newIamServiceAccountCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1225,7 +1401,9 @@ func newIamServiceAccountUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateServiceAccount(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateServiceAccount(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1285,6 +1463,7 @@ func newIamServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1330,7 +1509,9 @@ func newIamServiceAccountCreateCredentialCommand(state *cli.State) *cobra.Comman
 				}
 				body.ExpiresAt = &parsed
 			}
-			out, err := c.CreateServiceAccountCredential(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreateServiceAccountCredential(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1373,7 +1554,9 @@ func newIamServiceAccountCreateSshKeyCommand(state *cli.State) *cobra.Command {
 				}
 				body.ExpiresAt = &parsed
 			}
-			out, err := c.CreateServiceAccountSSHKey(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreateServiceAccountSSHKey(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1698,7 +1881,9 @@ func newIamServiceAccountSetInlinePolicyCommand(state *cli.State) *cobra.Command
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			out, err := c.PutServiceAccountInlinePolicy(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.PutServiceAccountInlinePolicy(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1730,7 +1915,9 @@ func newIamServiceAccountSetPermissionBoundaryCommand(state *cli.State) *cobra.C
 			if err != nil {
 				return err
 			}
-			if err := c.SetServiceAccountPermissionBoundary(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.SetServiceAccountPermissionBoundary(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set permission boundary requested.")
@@ -1808,7 +1995,9 @@ func newIamSshKeyCreateCommand(state *cli.State) *cobra.Command {
 				}
 				body.ExpiresAt = &parsed
 			}
-			out, err := c.CreatePersonalSSHKey(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.CreatePersonalSSHKey(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1951,7 +2140,9 @@ func newIamStsSessionRevokeCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("reason") {
 				body.Reason = &reasonFlag
 			}
-			out, err := c.RevokeSTSSession(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.RevokeSTSSession(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2030,7 +2221,9 @@ func newIamTokenCreateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("refresh-token") {
 				body.RefreshToken = &refreshTokenFlag
 			}
-			out, err := c.GetOAuthToken(cmd.Context(), &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.GetOAuthToken(cmd.Context(), &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2074,7 +2267,9 @@ func newIamTokenRevokeCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("token-type-hint") {
 				body.TokenTypeHint = &tokenTypeHintFlag
 			}
-			if err := c.RevokeOAuthToken(cmd.Context(), &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.RevokeOAuthToken(cmd.Context(), &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Revoked.")

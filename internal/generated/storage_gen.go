@@ -144,6 +144,7 @@ func newStorageBucketCreateCommand(state *cli.State) *cobra.Command {
 				body.ObjectLockEnabled = &objectLockEnabledFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -247,7 +248,9 @@ func newStorageBucketDeleteLifecycleCommand(state *cli.State) *cobra.Command {
 			if revision == "" {
 				return fmt.Errorf("--revision must be the value returned by get-lifecycle")
 			}
-			if err := c.DeleteBucketLifecycle(cmd.Context(), args[0], basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, basaltic.WithRequestHeader("If-Match", strconv.Quote(revision)))
+			if err := c.DeleteBucketLifecycle(cmd.Context(), args[0], reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Delete lifecycle requested.")
@@ -341,11 +344,11 @@ func newStorageBucketGetCorsCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.GetBucketCORS(cmd.Context(), args[0])
+			page, err := c.GetBucketCORS(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
@@ -364,11 +367,11 @@ func newStorageBucketGetEncryptionCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := c.GetBucketEncryption(cmd.Context(), args[0])
+			page, err := c.GetBucketEncryption(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			return state.Printer().Value(out)
+			return state.Printer().Page(page)
 		},
 	}
 	f := cmd.Flags()
@@ -576,27 +579,29 @@ func newStorageBucketRestoreCommand(state *cli.State) *cobra.Command {
 func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 	var body storage.PutBucketCORSRequest
 	var bodyFile string
-	var corsFlag string
+	var corsRulesFlag string
 	cmd := &cobra.Command{
 		Use:   "set-cors <bucket>",
 		Short: "Put bucket CORS configuration",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"cors": "cors",
-			}, []string{"cors"})
+				"cors_rules": "cors-rules",
+			}, []string{"cors_rules"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/cors")
 			if err != nil {
 				return err
 			}
-			if corsFlag != "" {
-				if err := json.Unmarshal([]byte(corsFlag), &body.CORS); err != nil {
-					return fmt.Errorf("--cors: %w", err)
+			if corsRulesFlag != "" {
+				if err := json.Unmarshal([]byte(corsRulesFlag), &body.CORSRules); err != nil {
+					return fmt.Errorf("--cors-rules: %w", err)
 				}
 			}
-			if err := c.PutBucketCORS(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketCORS(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set cors requested.")
@@ -606,7 +611,7 @@ func newStorageBucketSetCorsCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&corsFlag, "cors", "", "Cors (JSON)")
+	f.StringVar(&corsRulesFlag, "cors-rules", "", "Cors rules (JSON)")
 	return cmd
 }
 
@@ -633,7 +638,9 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
-			if err := c.PutBucketDeletionProtection(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketDeletionProtection(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set deletion protection requested.")
@@ -652,27 +659,29 @@ func newStorageBucketSetDeletionProtectionCommand(state *cli.State) *cobra.Comma
 func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 	var body storage.PutBucketEncryptionRequest
 	var bodyFile string
-	var encryptionFlag string
+	var encryptionRulesFlag string
 	cmd := &cobra.Command{
 		Use:   "set-encryption <bucket>",
 		Short: "Put bucket encryption configuration",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"encryption": "encryption",
-			}, []string{"encryption"})
+				"encryption_rules": "encryption-rules",
+			}, []string{"encryption_rules"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/encryption")
 			if err != nil {
 				return err
 			}
-			if encryptionFlag != "" {
-				if err := json.Unmarshal([]byte(encryptionFlag), &body.Encryption); err != nil {
-					return fmt.Errorf("--encryption: %w", err)
+			if encryptionRulesFlag != "" {
+				if err := json.Unmarshal([]byte(encryptionRulesFlag), &body.EncryptionRules); err != nil {
+					return fmt.Errorf("--encryption-rules: %w", err)
 				}
 			}
-			if err := c.PutBucketEncryption(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketEncryption(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set encryption requested.")
@@ -682,7 +691,7 @@ func newStorageBucketSetEncryptionCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&encryptionFlag, "encryption", "", "Encryption (JSON)")
+	f.StringVar(&encryptionRulesFlag, "encryption-rules", "", "Encryption rules (JSON)")
 	return cmd
 }
 
@@ -691,15 +700,15 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 	var revision string
 	var body storage.PutBucketLifecycleRequest
 	var bodyFile string
-	var lifecycleFlag string
+	var lifecycleRulesFlag string
 	cmd := &cobra.Command{
 		Use:   "set-lifecycle <bucket>",
 		Short: "Put bucket lifecycle configuration",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"lifecycle": "lifecycle",
-			}, []string{"lifecycle"})
+				"lifecycle_rules": "lifecycle-rules",
+			}, []string{"lifecycle_rules"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/lifecycle")
@@ -709,12 +718,15 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 			if revision == "" {
 				return fmt.Errorf("--revision must be the value returned by get-lifecycle")
 			}
-			if lifecycleFlag != "" {
-				if err := json.Unmarshal([]byte(lifecycleFlag), &body.Lifecycle); err != nil {
-					return fmt.Errorf("--lifecycle: %w", err)
+			if lifecycleRulesFlag != "" {
+				if err := json.Unmarshal([]byte(lifecycleRulesFlag), &body.LifecycleRules); err != nil {
+					return fmt.Errorf("--lifecycle-rules: %w", err)
 				}
 			}
-			if err := c.PutBucketLifecycle(cmd.Context(), args[0], &body, basaltic.WithRequestHeader("If-Match", strconv.Quote(revision))); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			reqOpts = append(reqOpts, basaltic.WithRequestHeader("If-Match", strconv.Quote(revision)))
+			if err := c.PutBucketLifecycle(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set lifecycle requested.")
@@ -726,7 +738,7 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&revision, "revision", "", "Revision returned by get-lifecycle. A stale revision is rejected; reload and review before retrying.")
 	_ = cmd.MarkFlagRequired("revision")
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&lifecycleFlag, "lifecycle", "", "Lifecycle (JSON)")
+	f.StringVar(&lifecycleRulesFlag, "lifecycle-rules", "", "Lifecycle rules (JSON)")
 	return cmd
 }
 
@@ -734,27 +746,21 @@ func newStorageBucketSetLifecycleCommand(state *cli.State) *cobra.Command {
 func newStorageBucketSetObjectLockCommand(state *cli.State) *cobra.Command {
 	var body storage.PutBucketObjectLockRequest
 	var bodyFile string
-	var objectLockFlag string
 	cmd := &cobra.Command{
 		Use:   "set-object-lock <bucket>",
 		Short: "Put bucket object-lock configuration",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"object_lock": "object-lock",
-			}, []string{"object_lock"})
+			return prepareBody(cmd, bodyFile, &body, map[string]string{}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := storageClient(state, "/v1/buckets/{bucket}/object-lock")
 			if err != nil {
 				return err
 			}
-			if objectLockFlag != "" {
-				if err := json.Unmarshal([]byte(objectLockFlag), &body.ObjectLock); err != nil {
-					return fmt.Errorf("--object-lock: %w", err)
-				}
-			}
-			if err := c.PutBucketObjectLock(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketObjectLock(cmd.Context(), args[0], body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set object lock requested.")
@@ -764,7 +770,6 @@ func newStorageBucketSetObjectLockCommand(state *cli.State) *cobra.Command {
 	f := cmd.Flags()
 	_ = f
 	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&objectLockFlag, "object-lock", "", "Object lock (JSON)")
 	return cmd
 }
 
@@ -792,7 +797,9 @@ func newStorageBucketSetPolicyCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			if err := c.PutBucketPolicy(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketPolicy(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set policy requested.")
@@ -830,7 +837,9 @@ func newStorageBucketSetTaggingCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			if err := c.PutBucketTagging(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketTagging(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set tagging requested.")
@@ -862,7 +871,9 @@ func newStorageBucketSetVersioningCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.PutBucketVersioning(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.PutBucketVersioning(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set versioning requested.")
@@ -968,6 +979,7 @@ func newStorageMultipartUploadCompleteCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1024,6 +1036,7 @@ func newStorageMultipartUploadInitiateCommand(state *cli.State) *cobra.Command {
 				body.StorageClass = &storageClassFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1285,7 +1298,7 @@ func newStorageSnapshotListCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last snapshot id from the previous page")
 	f.StringVar(&params.Name, "name", "", "Exact snapshot name within an explicitly supplied volume filter; missing volume returns 400")
-	f.StringVar(&params.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID, CRN, or exact name")
+	f.StringVar(&params.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID or nested CRN (volume/<volume-name>/snapshot-policy/<policy-name>), or exact name when volume is supplied")
 	f.StringVar((*string)(&params.Status), "status", "", "Status (one of: creating, available, deleting, error)")
 	f.StringVar(&params.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
@@ -1314,7 +1327,7 @@ func newStorageSnapshotGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&scope.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID, CRN, or exact name")
+	f.StringVar(&scope.SnapshotPolicy, "snapshot-policy", "", "Account-owned snapshot policy UUID or nested CRN (volume/<volume-name>/snapshot-policy/<policy-name>), or exact name when volume is supplied")
 	f.StringVar(&scope.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	return cmd
 }
@@ -1353,6 +1366,7 @@ func newStorageSnapshotCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1403,7 +1417,9 @@ func newStorageSnapshotUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateSnapshot(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateSnapshot(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1462,12 +1478,12 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 	var enabledFlag bool
 	var fetchAll bool
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   "list <volume-id>",
 		Short: "List snapshot policies",
-		Args:  cobra.ExactArgs(0),
+		Args:  cobra.ExactArgs(1),
 		Long:  "List snapshot policies.\n\nReturns one page. Pass --all to walk every page.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state, "/v1/snapshot-policies")
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/snapshot-policies")
 			if err != nil {
 				return err
 			}
@@ -1475,9 +1491,9 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 				params.Enabled = &enabledFlag
 			}
 			if fetchAll {
-				return state.Printer().Iter(c.ListSnapshotPoliciesAll(cmd.Context(), &params))
+				return state.Printer().Iter(c.ListSnapshotPoliciesAll(cmd.Context(), args[0], &params))
 			}
-			page, err := c.ListSnapshotPolicies(cmd.Context(), &params)
+			page, err := c.ListSnapshotPolicies(cmd.Context(), args[0], &params)
 			if err != nil {
 				return err
 			}
@@ -1490,8 +1506,7 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 	f.BoolVar(&enabledFlag, "enabled", false, "Narrow to enabled (or paused) policies")
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last policy id from the previous page")
-	f.StringVar(&params.Name, "name", "", "Exact account-scoped name match; an empty value matches nothing")
-	f.StringVar(&params.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
+	f.StringVar(&params.Name, "name", "", "Exact volume-scoped name match; an empty value matches nothing")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1500,16 +1515,16 @@ func newStorageSnapshotPolicyListCommand(state *cli.State) *cobra.Command {
 func newStorageSnapshotPolicyGetCommand(state *cli.State) *cobra.Command {
 	var scope storage.ListSnapshotPoliciesParams
 	cmd := &cobra.Command{
-		Use:   "get <ref>",
+		Use:   "get <volume-id> <ref>",
 		Short: "Get snapshot policy",
-		Args:  cobra.ExactArgs(1),
-		Long:  "Get snapshot policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.\n\nA name is unique only within its parent: pass --volume with a name, or the\nlookup can match more than one and is refused.",
+		Args:  cobra.ExactArgs(2),
+		Long:  "Get snapshot policy.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
-			out, err := c.GetSnapshotPolicyByReference(cmd.Context(), args[0], &scope)
+			out, err := c.GetSnapshotPolicyByReference(cmd.Context(), args[0], args[1], &scope)
 			if err != nil {
 				return err
 			}
@@ -1518,7 +1533,6 @@ func newStorageSnapshotPolicyGetCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&scope.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	return cmd
 }
 
@@ -1532,9 +1546,9 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 	var tagsFlag string
 	var idempotencyKey string
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create <volume-id>",
 		Short: "Create snapshot policy",
-		Args:  cobra.ExactArgs(0),
+		Args:  cobra.ExactArgs(1),
 		Long:  "Create snapshot policy.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
@@ -1545,11 +1559,10 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 				"retention_count":  "retention-count",
 				"retention_days":   "retention-days",
 				"tags":             "tags",
-				"volume":           "volume",
-			}, []string{"interval_minutes", "name", "retention_count", "volume"})
+			}, []string{"interval_minutes", "name", "retention_count"})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state, "/v1/snapshot-policies")
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/snapshot-policies")
 			if err != nil {
 				return err
 			}
@@ -1568,10 +1581,11 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
-			out, err := c.CreateSnapshotPolicy(cmd.Context(), &body, reqOpts...)
+			out, err := c.CreateSnapshotPolicy(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1584,11 +1598,10 @@ func newStorageSnapshotPolicyCreateCommand(state *cli.State) *cobra.Command {
 	f.StringVar(&descriptionFlag, "description", "", "Description")
 	f.BoolVar(&enabledFlag, "enabled", false, "Defaults to true")
 	f.IntVar(&body.IntervalMinutes, "interval-minutes", 0, "Interval minutes")
-	f.StringVar(&body.Name, "name", "", "Unique within the account — it names the policy in its CRN")
+	f.StringVar(&body.Name, "name", "", "Unique within the volume — it names the policy in its CRN")
 	f.IntVar(&body.RetentionCount, "retention-count", 0, "Retention count")
 	f.IntVar(&retentionDaysFlag, "retention-days", 0, "Retention days")
 	f.StringVar(&tagsFlag, "tags", "", "Tags (JSON)")
-	f.StringVar(&body.Volume, "volume", "", "Account-owned volume UUID, CRN, or exact name")
 	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
@@ -1604,9 +1617,9 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 	var retentionDaysFlag int
 	var tagsFlag string
 	cmd := &cobra.Command{
-		Use:   "update <policy-id>",
+		Use:   "update <volume-id> <policy-id>",
 		Short: "Update snapshot policy",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
 				"description":      "description",
@@ -1618,7 +1631,7 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
@@ -1642,7 +1655,9 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateSnapshotPolicy(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateSnapshotPolicy(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1664,15 +1679,15 @@ func newStorageSnapshotPolicyUpdateCommand(state *cli.State) *cobra.Command {
 // newStorageSnapshotPolicyDeleteCommand builds `basaltic storage snapshot-policy delete`.
 func newStorageSnapshotPolicyDeleteCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete <policy-id>",
+		Use:   "delete <volume-id> <policy-id>",
 		Short: "Delete snapshot policy",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := storageClient(state, "/v1/snapshot-policies/{policy_id}")
+			c, err := storageClient(state, "/v1/volumes/{volume_id}/snapshot-policies/{policy_id}")
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteSnapshotPolicy(cmd.Context(), args[0]); err != nil {
+			if err := c.DeleteSnapshotPolicy(cmd.Context(), args[0], args[1]); err != nil {
 				return err
 			}
 			state.Printer().Done("Deleted.")
@@ -1731,7 +1746,7 @@ func newStorageVolumeListCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&params.Limit, "limit", 0, "Limit")
 	f.StringVar(&params.Marker, "marker", "", "Resume token — the last volume id from the previous page")
 	f.StringVar(&params.Name, "name", "", "Exact account-scoped name match; an empty value matches nothing")
-	f.StringVar((*string)(&params.Status), "status", "", "Status (one of: creating, available, in_use, extending, deleting, error)")
+	f.StringVar((*string)(&params.Status), "status", "", "Status (one of: creating, available, in_use, extending, updating, deleting, error)")
 	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
 	return cmd
 }
@@ -1823,6 +1838,7 @@ func newStorageVolumeCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1879,7 +1895,9 @@ func newStorageVolumeUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateVolume(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateVolume(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1938,6 +1956,7 @@ func newStorageVolumeExtendCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1986,6 +2005,7 @@ func newStorageVolumeUpdatePerformanceCommand(state *cli.State) *cobra.Command {
 				body.ThroughputMiBS = &throughputMiBsFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}

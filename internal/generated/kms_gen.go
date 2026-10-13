@@ -170,6 +170,7 @@ func newKmsKeyCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -221,7 +222,9 @@ func newKmsKeyUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdateKey(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateKey(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -294,7 +297,9 @@ func newKmsKeyDecryptCommand(state *cli.State) *cobra.Command {
 				}
 				body.Ciphertext = decoded
 			}
-			out, err := c.Decrypt(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.Decrypt(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -390,7 +395,9 @@ func newKmsKeyEncryptCommand(state *cli.State) *cobra.Command {
 				}
 				body.Plaintext = decoded
 			}
-			out, err := c.Encrypt(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.Encrypt(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -427,7 +434,9 @@ func newKmsKeyGenerateDataKeyCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("number-of-bytes") {
 				body.NumberOfBytes = &numberOfBytesFlag
 			}
-			out, err := c.GenerateDataKey(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.GenerateDataKey(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -547,7 +556,9 @@ func newKmsKeyRewrapCommand(state *cli.State) *cobra.Command {
 				}
 				body.Ciphertext = decoded
 			}
-			out, err := c.Rewrap(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.Rewrap(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -636,7 +647,9 @@ func newKmsKeyScheduleDeletionCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("recovery-window-days") {
 				body.RecoveryWindowDays = &recoveryWindowDaysFlag
 			}
-			out, err := c.ScheduleKeyDeletion(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.ScheduleKeyDeletion(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -673,7 +686,9 @@ func newKmsKeySetRotationCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("rotation-period-days") {
 				body.RotationPeriodDays = &rotationPeriodDaysFlag
 			}
-			out, err := c.SetKeyRotation(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.SetKeyRotation(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -719,7 +734,9 @@ func newKmsKeySignCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("signing-algorithm") {
 				body.SigningAlgorithm = (*kms.SigningAlgorithm)(&signingAlgorithmFlag)
 			}
-			out, err := c.Sign(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.Sign(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -779,7 +796,9 @@ func newKmsKeyVerifyCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("signing-algorithm") {
 				body.SigningAlgorithm = (*kms.SigningAlgorithm)(&signingAlgorithmFlag)
 			}
-			out, err := c.Verify(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.Verify(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}

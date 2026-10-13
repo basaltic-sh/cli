@@ -152,6 +152,7 @@ func newWorkspaceAccountCreateCommand(state *cli.State) *cobra.Command {
 				body.Description = &descriptionFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -199,7 +200,9 @@ func newWorkspaceAccountUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("name") {
 				body.Name = &nameFlag
 			}
-			out, err := c.UpdateAccount(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateAccount(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -257,7 +260,9 @@ func newWorkspaceAccountAssignRoleAssignmentCommand(state *cli.State) *cobra.Com
 			if err != nil {
 				return err
 			}
-			out, err := c.AssignAccountRole(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.AssignAccountRole(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -484,6 +489,7 @@ func newWorkspaceGroupCreateCommand(state *cli.State) *cobra.Command {
 				body.Description = &descriptionFlag
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -525,7 +531,9 @@ func newWorkspaceGroupUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &descriptionFlag
 			}
-			out, err := c.UpdateGroup(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateGroup(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -583,6 +591,7 @@ func newWorkspaceGroupAttachPolicyCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -780,7 +789,9 @@ func newWorkspaceGroupSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			out, err := c.PutGroupInlinePolicy(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.PutGroupInlinePolicy(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -998,7 +1009,9 @@ func newWorkspaceOrganizationUpdateCommand(state *cli.State) *cobra.Command {
 			if cmd.Flags().Changed("time-zone") {
 				body.TimeZone = &timeZoneFlag
 			}
-			out, err := c.UpdateOrganization(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateOrganization(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1157,6 +1170,7 @@ func newWorkspacePolicyCreateCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1214,7 +1228,9 @@ func newWorkspacePolicyUpdateCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--tags: %w", err)
 				}
 			}
-			out, err := c.UpdatePolicy(cmd.Context(), args[0], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdatePolicy(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -1423,6 +1439,7 @@ func newWorkspaceRoleAttachPolicyCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1524,6 +1541,7 @@ func newWorkspaceServiceAccountAttachPolicyCommand(state *cli.State) *cobra.Comm
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1712,6 +1730,7 @@ func newWorkspaceUserAddCommand(state *cli.State) *cobra.Command {
 				}
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1753,6 +1772,7 @@ func newWorkspaceUserAddGroupCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -1792,6 +1812,7 @@ func newWorkspaceUserAttachPolicyCommand(state *cli.State) *cobra.Command {
 				return err
 			}
 			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
 			if idempotencyKey != "" {
 				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
 			}
@@ -2073,7 +2094,9 @@ func newWorkspaceUserSetInlinePolicyCommand(state *cli.State) *cobra.Command {
 					return fmt.Errorf("--document: %w", err)
 				}
 			}
-			out, err := c.PutUserInlinePolicy(cmd.Context(), args[0], args[1], &body)
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.PutUserInlinePolicy(cmd.Context(), args[0], args[1], &body, reqOpts...)
 			if err != nil {
 				return err
 			}
@@ -2105,7 +2128,9 @@ func newWorkspaceUserSetPermissionBoundaryCommand(state *cli.State) *cobra.Comma
 			if err != nil {
 				return err
 			}
-			if err := c.SetUserPermissionBoundary(cmd.Context(), args[0], &body); err != nil {
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if err := c.SetUserPermissionBoundary(cmd.Context(), args[0], &body, reqOpts...); err != nil {
 				return err
 			}
 			state.Printer().Done("Set permission boundary requested.")
