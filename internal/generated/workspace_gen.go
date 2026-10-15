@@ -60,9 +60,12 @@ func newWorkspaceAccountCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newWorkspaceAccountUpdateCommand(state))
 	cmd.AddCommand(newWorkspaceAccountDeleteCommand(state))
 	cmd.AddCommand(newWorkspaceAccountAssignRoleAssignmentCommand(state))
+	cmd.AddCommand(newWorkspaceAccountGetOnboardingCommand(state))
 	cmd.AddCommand(newWorkspaceAccountGetResourceCommand(state))
 	cmd.AddCommand(newWorkspaceAccountListRoleAssignmentsCommand(state))
 	cmd.AddCommand(newWorkspaceAccountRemoveRoleAssignmentCommand(state))
+	cmd.AddCommand(newWorkspaceAccountRetryOnboardingCommand(state))
+	cmd.AddCommand(newWorkspaceAccountUpdateOnboardingCommand(state))
 	return cmd
 }
 
@@ -278,6 +281,29 @@ func newWorkspaceAccountAssignRoleAssignmentCommand(state *cli.State) *cobra.Com
 	return cmd
 }
 
+// newWorkspaceAccountGetOnboardingCommand builds `basaltic workspace account get-onboarding`.
+func newWorkspaceAccountGetOnboardingCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-onboarding <account-id>",
+		Short: "Get shared account setup progress",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/onboarding")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetAccountOnboarding(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
 // newWorkspaceAccountGetResourceCommand builds `basaltic workspace account get-resource`.
 func newWorkspaceAccountGetResourceCommand(state *cli.State) *cobra.Command {
 	cmd := &cobra.Command{
@@ -344,6 +370,85 @@ func newWorkspaceAccountRemoveRoleAssignmentCommand(state *cli.State) *cobra.Com
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newWorkspaceAccountRetryOnboardingCommand builds `basaltic workspace account retry-onboarding`.
+func newWorkspaceAccountRetryOnboardingCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "retry-onboarding <account-id>",
+		Short: "Resume failed default network provisioning",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/onboarding/retry")
+			if err != nil {
+				return err
+			}
+			out, err := c.RetryAccountProvisioning(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newWorkspaceAccountUpdateOnboardingCommand builds `basaltic workspace account update-onboarding`.
+func newWorkspaceAccountUpdateOnboardingCommand(state *cli.State) *cobra.Command {
+	var body workspace.AccountOnboardingUpdateRequest
+	var bodyFile string
+	var confirmedInstanceIdFlag string
+	var dismissedFlag bool
+	var instanceIdFlag string
+	var welcomeSeenFlag bool
+	cmd := &cobra.Command{
+		Use:   "update-onboarding <account-id>",
+		Short: "Update shared account guide preferences",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"confirmed_instance_id": "confirmed-instance-id",
+				"dismissed":             "dismissed",
+				"instance_id":           "instance-id",
+				"welcome_seen":          "welcome-seen",
+			}, []string{})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := workspaceClient(state, "/v1/accounts/{account_id}/onboarding")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("confirmed-instance-id") {
+				body.ConfirmedInstanceID = &confirmedInstanceIdFlag
+			}
+			if cmd.Flags().Changed("dismissed") {
+				body.Dismissed = &dismissedFlag
+			}
+			if cmd.Flags().Changed("instance-id") {
+				body.InstanceID = &instanceIdFlag
+			}
+			if cmd.Flags().Changed("welcome-seen") {
+				body.WelcomeSeen = &welcomeSeenFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateAccountOnboarding(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.StringVar(&confirmedInstanceIdFlag, "confirmed-instance-id", "", "Confirmed instance id")
+	f.BoolVar(&dismissedFlag, "dismissed", false, "Dismissed")
+	f.StringVar(&instanceIdFlag, "instance-id", "", "Instance id")
+	f.BoolVar(&welcomeSeenFlag, "welcome-seen", false, "Welcome seen")
 	return cmd
 }
 

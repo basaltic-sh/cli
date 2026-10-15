@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestSnapshotSizeJSONPreservesZeroAndCapacity(t *testing.T) {
+func TestSnapshotSizeJSONPreservesUnknownZeroAndUsage(t *testing.T) {
 	for _, raw := range []string{
-		`0`, `4096`, `10737418240`,
+		`null`, `0`, `4096`, `10737418240`,
 	} {
 		var snapshot storage.Snapshot
 		if err := json.Unmarshal([]byte(`{"size_bytes":`+raw+`}`), &snapshot); err != nil {
