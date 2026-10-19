@@ -28,6 +28,7 @@ func newTelemetryCommand(state *cli.State) *cobra.Command {
 		Aliases: []string{"tel"},
 		Long:    "Logs, metrics and traces.\n\nThis is a regional service: it acts in the region from --region, the\nBASALTIC_REGION environment variable, or the profile.",
 	}
+	cmd.AddCommand(newTelemetryAlertCommand(state))
 	cmd.AddCommand(newTelemetryLogCommand(state))
 	cmd.AddCommand(newTelemetryLogGroupCommand(state))
 	cmd.AddCommand(newTelemetryMetricCommand(state))
@@ -45,6 +46,264 @@ func telemetryClient(state *cli.State, path string) (*telemetry.Client, error) {
 		return nil, err
 	}
 	return telemetry.New(cfg), nil
+}
+
+// newTelemetryAlertCommand builds `basaltic telemetry alert`.
+func newTelemetryAlertCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "alert",
+		Short:   "Alerts",
+		Aliases: []string{"alerts"},
+	}
+	cmd.AddCommand(newTelemetryAlertListCommand(state))
+	cmd.AddCommand(newTelemetryAlertGetCommand(state))
+	cmd.AddCommand(newTelemetryAlertCreateCommand(state))
+	cmd.AddCommand(newTelemetryAlertUpdateCommand(state))
+	cmd.AddCommand(newTelemetryAlertDeleteCommand(state))
+	return cmd
+}
+
+// newTelemetryAlertListCommand builds `basaltic telemetry alert list`.
+func newTelemetryAlertListCommand(state *cli.State) *cobra.Command {
+	var params telemetry.ListAlertsParams
+	var fetchAll bool
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List metric alerts",
+		Args:  cobra.ExactArgs(0),
+		Long:  "List metric alerts.\n\nReturns one page. Pass --all to walk every page.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/alerts")
+			if err != nil {
+				return err
+			}
+			if fetchAll {
+				return state.Printer().Iter(c.ListAlertsAll(cmd.Context(), &params))
+			}
+			page, err := c.ListAlerts(cmd.Context(), &params)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Page(page)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVar(&params.CRN, "crn", "", "Exact canonical alert CRN, intersected with name and state")
+	f.IntVar(&params.Limit, "limit", 0, "Maximum number of items to return")
+	f.StringVar(&params.Marker, "marker", "", "Opaque pagination cursor")
+	f.StringVar(&params.Name, "name", "", "Exact name filter; an explicitly empty name matches nothing")
+	f.StringVar(&params.State, "state", "", "Filter effective state")
+	f.BoolVar(&fetchAll, "all", false, "Fetch every page, not just the first.")
+	return cmd
+}
+
+// newTelemetryAlertGetCommand builds `basaltic telemetry alert get`.
+func newTelemetryAlertGetCommand(state *cli.State) *cobra.Command {
+	var scope telemetry.ListAlertsParams
+	cmd := &cobra.Command{
+		Use:   "get <ref>",
+		Short: "Get a metric alert",
+		Args:  cobra.ExactArgs(1),
+		Long:  "Get a metric alert.\n\n<ref> is its id, its CRN or its name. It is read by its syntax alone, the way the\nplatform reads it: a crn: value is a CRN, the 36-character UUID form is an\nid, anything else is a name. A miss under one reading is not retried\nunder another.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/alerts/{id}")
+			if err != nil {
+				return err
+			}
+			out, err := c.GetAlertByReference(cmd.Context(), args[0], &scope)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
+}
+
+// newTelemetryAlertCreateCommand builds `basaltic telemetry alert create`.
+func newTelemetryAlertCreateCommand(state *cli.State) *cobra.Command {
+	var body telemetry.CreateAlertRequest
+	var bodyFile string
+	var enabledFlag bool
+	var expressionFlag string
+	var silencedUntilFlag string
+	var idempotencyKey string
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a metric alert",
+		Args:  cobra.ExactArgs(0),
+		Long:  "Create a metric alert.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"enabled":        "enabled",
+				"expression":     "expression",
+				"for_seconds":    "for-seconds",
+				"name":           "name",
+				"operator":       "operator",
+				"silenced_until": "silenced-until",
+				"threshold":      "threshold",
+				"topic":          "topic",
+				"window_seconds": "window-seconds",
+			}, []string{"expression", "for_seconds", "name", "operator", "threshold", "topic", "window_seconds"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/alerts")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("enabled") {
+				body.Enabled = &enabledFlag
+			}
+			if expressionFlag != "" {
+				if err := json.Unmarshal([]byte(expressionFlag), &body.Expression); err != nil {
+					return fmt.Errorf("--expression: %w", err)
+				}
+			}
+			if silencedUntilFlag != "" {
+				parsed, err := parseTime(silencedUntilFlag)
+				if err != nil {
+					return fmt.Errorf("--silenced-until: %w", err)
+				}
+				body.SilencedUntil = &parsed
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if idempotencyKey != "" {
+				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
+			}
+			out, err := c.CreateAlert(cmd.Context(), &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&enabledFlag, "enabled", false, "Enabled")
+	f.StringVar(&expressionFlag, "expression", "", "Expression (JSON)")
+	f.IntVar(&body.ForSeconds, "for-seconds", 0, "Continuous breach duration before firing; 0 fires immediately")
+	f.StringVar(&body.Name, "name", "", "Immutable account-unique name")
+	f.StringVar(&body.Operator, "operator", "", "Operator (one of: gt, gte, lt, lte)")
+	f.StringVar(&silencedUntilFlag, "silenced-until", "", "Mute notifications until this instant (at most 30 days ahead) (RFC 3339)")
+	f.Float64Var(&body.Threshold, "threshold", 0, "Threshold")
+	f.StringVar(&body.Topic, "topic", "", "Required same-account, same-region notification topic reference: UUID, canonical CRN or exact name, classified by syntax")
+	f.IntVar(&body.WindowSeconds, "window-seconds", 0, "Whole-minute window")
+	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
+	return cmd
+}
+
+// newTelemetryAlertUpdateCommand builds `basaltic telemetry alert update`.
+func newTelemetryAlertUpdateCommand(state *cli.State) *cobra.Command {
+	var body telemetry.UpdateAlertRequest
+	var bodyFile string
+	var enabledFlag bool
+	var expressionFlag string
+	var forSecondsFlag int
+	var operatorFlag string
+	var silencedUntilFlag string
+	var thresholdFlag float64
+	var topicFlag string
+	var windowSecondsFlag int
+	cmd := &cobra.Command{
+		Use:   "update <id>",
+		Short: "Update a metric alert",
+		Args:  cobra.ExactArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"enabled":        "enabled",
+				"expression":     "expression",
+				"for_seconds":    "for-seconds",
+				"operator":       "operator",
+				"silenced_until": "silenced-until",
+				"threshold":      "threshold",
+				"topic":          "topic",
+				"window_seconds": "window-seconds",
+			}, []string{})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/alerts/{id}")
+			if err != nil {
+				return err
+			}
+			if cmd.Flags().Changed("enabled") {
+				body.Enabled = &enabledFlag
+			}
+			if expressionFlag != "" {
+				if err := json.Unmarshal([]byte(expressionFlag), &body.Expression); err != nil {
+					return fmt.Errorf("--expression: %w", err)
+				}
+			}
+			if cmd.Flags().Changed("for-seconds") {
+				body.ForSeconds = &forSecondsFlag
+			}
+			if cmd.Flags().Changed("operator") {
+				body.Operator = &operatorFlag
+			}
+			if silencedUntilFlag != "" {
+				parsed, err := parseTime(silencedUntilFlag)
+				if err != nil {
+					return fmt.Errorf("--silenced-until: %w", err)
+				}
+				body.SilencedUntil = &parsed
+			}
+			if cmd.Flags().Changed("threshold") {
+				body.Threshold = &thresholdFlag
+			}
+			if cmd.Flags().Changed("topic") {
+				body.Topic = &topicFlag
+			}
+			if cmd.Flags().Changed("window-seconds") {
+				body.WindowSeconds = &windowSecondsFlag
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateAlert(cmd.Context(), args[0], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&enabledFlag, "enabled", false, "Enabled")
+	f.StringVar(&expressionFlag, "expression", "", "Expression (JSON)")
+	f.IntVar(&forSecondsFlag, "for-seconds", 0, "Continuous breach duration before firing; 0 fires immediately")
+	f.StringVar(&operatorFlag, "operator", "", "Operator (one of: gt, gte, lt, lte)")
+	f.StringVar(&silencedUntilFlag, "silenced-until", "", "Mute notifications until this instant (at most 30 days ahead) (RFC 3339)")
+	f.Float64Var(&thresholdFlag, "threshold", 0, "Threshold")
+	f.StringVar(&topicFlag, "topic", "", "Required same-account, same-region notification topic reference: UUID, canonical CRN or exact name, classified by syntax")
+	f.IntVar(&windowSecondsFlag, "window-seconds", 0, "Whole-minute window")
+	return cmd
+}
+
+// newTelemetryAlertDeleteCommand builds `basaltic telemetry alert delete`.
+func newTelemetryAlertDeleteCommand(state *cli.State) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <id>",
+		Short: "Delete a metric alert",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := telemetryClient(state, "/v1/alerts/{id}")
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteAlert(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			state.Printer().Done("Deleted.")
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	return cmd
 }
 
 // newTelemetryLogCommand builds `basaltic telemetry log`.

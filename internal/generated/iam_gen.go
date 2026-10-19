@@ -27,7 +27,6 @@ func newIamCommand(state *cli.State) *cobra.Command {
 		Short: "Account roles, policies, service accounts and sessions",
 	}
 	cmd.AddCommand(newIamAuthCommand(state))
-	cmd.AddCommand(newIamOauthCommand(state))
 	cmd.AddCommand(newIamOidcProviderCommand(state))
 	cmd.AddCommand(newIamPolicyCommand(state))
 	cmd.AddCommand(newIamRoleCommand(state))
@@ -78,65 +77,6 @@ func newIamAuthGetLinuxIdentityCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
-	return cmd
-}
-
-// newIamOauthCommand builds `basaltic iam oauth`.
-func newIamOauthCommand(state *cli.State) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "oauth",
-		Short:   "Oauths",
-		Aliases: []string{"oauths"},
-	}
-	cmd.AddCommand(newIamOauthAuthorizeCommand(state))
-	return cmd
-}
-
-// newIamOauthAuthorizeCommand builds `basaltic iam oauth authorize`.
-func newIamOauthAuthorizeCommand(state *cli.State) *cobra.Command {
-	var body iam.OAuthAuthorizeRequest
-	var bodyFile string
-	var stateFlag string
-	cmd := &cobra.Command{
-		Use:   "authorize",
-		Short: "Approve a CLI login and issue an authorization code",
-		Args:  cobra.ExactArgs(0),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"client_id":             "client-id",
-				"code_challenge":        "code-challenge",
-				"code_challenge_method": "code-challenge-method",
-				"organization":          "organization",
-				"redirect_uri":          "redirect-uri",
-				"state":                 "state",
-			}, []string{"client_id", "code_challenge", "code_challenge_method", "organization", "redirect_uri"})
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := iamClient(state, "/v1/oauth/authorize")
-			if err != nil {
-				return err
-			}
-			if cmd.Flags().Changed("state") {
-				body.State = &stateFlag
-			}
-			var reqOpts []basaltic.RequestOption
-			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
-			out, err := c.AuthorizeOAuthClient(cmd.Context(), &body, reqOpts...)
-			if err != nil {
-				return err
-			}
-			return state.Printer().Value(out)
-		},
-	}
-	f := cmd.Flags()
-	_ = f
-	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
-	f.StringVar(&body.ClientID, "client-id", "", "The registered client being approved")
-	f.StringVar(&body.CodeChallenge, "code-challenge", "", "Base64url SHA-256 of the client's PKCE verifier, without padding")
-	f.StringVar(&body.CodeChallengeMethod, "code-challenge-method", "", "S256 only (one of: S256)")
-	f.StringVar((*string)(&body.Organization), "organization", "", "Organization")
-	f.StringVar(&body.RedirectURI, "redirect-uri", "", "For the CLI this must be urn:ietf:wg:oauth:2.0:oob — the out-of-band pseudo-redirect, meaning the code is DISPLAYED rather than delivered anywhere")
-	f.StringVar(&stateFlag, "state", "", "Opaque value echoed back on the redirect, unchanged")
 	return cmd
 }
 
