@@ -1241,6 +1241,7 @@ func newComputeInstancePoolCommand(state *cli.State) *cobra.Command {
 	cmd.AddCommand(newComputeInstancePoolListFloatingIpsCommand(state))
 	cmd.AddCommand(newComputeInstancePoolListInstancesCommand(state))
 	cmd.AddCommand(newComputeInstancePoolRefreshCommand(state))
+	cmd.AddCommand(newComputeInstancePoolUpdateInstanceCommand(state))
 	return cmd
 }
 
@@ -1404,20 +1405,23 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	var minCountFlag int
 	var tagsFlag string
 	var templateFlag string
+	var idempotencyKey string
 	cmd := &cobra.Command{
 		Use:   "update <pool-id>",
 		Short: "Update an instance pool's description, size, tags or launch template",
 		Args:  cobra.ExactArgs(1),
+		Long:  "Update an instance pool's description, size, tags or launch template.\n\nPass --idempotency-key to make this call replay-safe, which also\nmakes it safe for the CLI to retry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return prepareBody(cmd, bodyFile, &body, map[string]string{
-				"autoscaling":   "autoscaling",
-				"description":   "description",
-				"desired_count": "desired-count",
-				"max_count":     "max-count",
-				"min_count":     "min-count",
-				"subnets":       "subnets",
-				"tags":          "tags",
-				"template":      "template",
+				"autoscaling":        "autoscaling",
+				"description":        "description",
+				"desired_count":      "desired-count",
+				"max_count":          "max-count",
+				"min_count":          "min-count",
+				"scale_in_instances": "scale-in-instances",
+				"subnets":            "subnets",
+				"tags":               "tags",
+				"template":           "template",
 			}, []string{})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -1454,6 +1458,9 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 			}
 			var reqOpts []basaltic.RequestOption
 			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			if idempotencyKey != "" {
+				reqOpts = append(reqOpts, basaltic.WithIdempotencyKey(idempotencyKey))
+			}
 			out, err := c.UpdateInstancePool(cmd.Context(), args[0], &body, reqOpts...)
 			if err != nil {
 				return err
@@ -1469,9 +1476,11 @@ func newComputeInstancePoolUpdateCommand(state *cli.State) *cobra.Command {
 	f.IntVar(&desiredCountFlag, "desired-count", 0, "New target size, bounded by the resulting min_count/max_count and the hard platform cap of 100")
 	f.IntVar(&maxCountFlag, "max-count", 0, "New upper bound; omitted desired_count falls to this bound if needed")
 	f.IntVar(&minCountFlag, "min-count", 0, "New lower bound; omitted desired_count rises to this bound if needed")
+	f.StringSliceVar(&body.ScaleInInstances, "scale-in-instances", nil, "Exact member UUIDs to retire")
 	f.StringSliceVar(&body.Subnets, "subnets", nil, "Replace the eligible placement set")
 	f.StringVar(&tagsFlag, "tags", "", "REPLACES the pool's labels: the map you send becomes the whole set, an empty object clears them, and omitting the field leaves them alone (JSON)")
 	f.StringVar(&templateFlag, "template", "", "Replaces the launch config WHOLESALE — the object you send is what the pool launches next, and anything you leave out is cleared rather than kept (JSON)")
+	f.StringVar(&idempotencyKey, "idempotency-key", "", "Makes this call replay-safe: retrying with the same key returns the original outcome instead of creating a second resource.")
 	return cmd
 }
 
@@ -1652,5 +1661,39 @@ func newComputeInstancePoolRefreshCommand(state *cli.State) *cobra.Command {
 	}
 	f := cmd.Flags()
 	_ = f
+	return cmd
+}
+
+// newComputeInstancePoolUpdateInstanceCommand builds `basaltic compute instance-pool update-instance`.
+func newComputeInstancePoolUpdateInstanceCommand(state *cli.State) *cobra.Command {
+	var body compute.InstancePoolMemberProtectionRequest
+	var bodyFile string
+	cmd := &cobra.Command{
+		Use:   "update-instance <pool-id> <instance-id>",
+		Short: "Update member scale-in protection",
+		Args:  cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return prepareBody(cmd, bodyFile, &body, map[string]string{
+				"scale_in_protected": "scale-in-protected",
+			}, []string{"scale_in_protected"})
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := computeClient(state, "/v1/instance-pools/{pool_id}/instances/{instance_id}")
+			if err != nil {
+				return err
+			}
+			var reqOpts []basaltic.RequestOption
+			reqOpts = append(reqOpts, bodyRequestOptions(cmd)...)
+			out, err := c.UpdateInstancePoolMemberProtection(cmd.Context(), args[0], args[1], &body, reqOpts...)
+			if err != nil {
+				return err
+			}
+			return state.Printer().Value(out)
+		},
+	}
+	f := cmd.Flags()
+	_ = f
+	f.StringVarP(&bodyFile, "from-file", "f", "", "Read the request body from a JSON or YAML file, or - for stdin. Flags override what it sets.")
+	f.BoolVar(&body.ScaleInProtected, "scale-in-protected", false, "Protect this member from manual and automatic scale-in")
 	return cmd
 }

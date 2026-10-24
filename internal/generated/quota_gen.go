@@ -47,15 +47,15 @@ func newQuotaQuotaListCommand(state *cli.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			page, err := c.ListQuotas(cmd.Context(), &params)
+			out, err := c.ListQuotas(cmd.Context(), &params)
 			if err != nil {
 				return err
 			}
-			return state.Printer().Page(page)
+			return state.Printer().Value(out)
 		},
 	}
 	f := cmd.Flags()
 	_ = f
-	f.StringVar(&params.Region, "for-region", "", "Region to filter regional quotas by")
+	f.StringVar(&params.Region, "for-region", "", "Region for organization resource quotas and Email policies")
 	return cmd
 }
